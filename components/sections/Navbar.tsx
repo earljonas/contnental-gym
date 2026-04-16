@@ -72,7 +72,7 @@ export function Navbar() {
 
         {/* CTA */}
         <a
-          href="#contact"
+          href="/register"
           className="hidden h-9 items-center bg-gold px-5 text-[12px] font-medium uppercase tracking-[0.15em] text-black transition-opacity duration-200 hover:opacity-90 md:inline-flex"
           style={{ borderRadius: 0 }}
         >
@@ -122,7 +122,7 @@ export function Navbar() {
             </a>
           ))}
           <a
-            href="#contact"
+            href="/register"
             onClick={() => setMobileOpen(false)}
             className="mt-4 inline-flex h-12 items-center bg-gold px-8 text-[13px] font-medium uppercase tracking-[0.15em] text-black"
           >

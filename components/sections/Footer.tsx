@@ -1,10 +1,3 @@
-const footerLinks = [
-  { label: "Programs", href: "#programs" },
-  { label: "Coaches", href: "#coaches" },
-  { label: "Membership", href: "#membership" },
-  { label: "Contact", href: "#contact" },
-];
-
 export function Footer() {
   return (
     <footer className="border-t border-border-subtle bg-page-bg py-8">
@@ -18,19 +11,6 @@ export function Footer() {
             FITNESS GYM
           </span>
         </a>
-
-        {/* Nav */}
-        <nav className="flex gap-6">
-          {footerLinks.map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
-              className="text-[12px] font-medium uppercase tracking-[0.1em] text-text-secondary transition-colors duration-200 hover:text-white"
-            >
-              {link.label}
-            </a>
-          ))}
-        </nav>
 
         {/* Copyright */}
         <p className="text-[12px] text-text-muted">

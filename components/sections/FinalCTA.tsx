@@ -27,23 +27,7 @@ export function FinalCTA() {
           and the best starting point based on how you want to train.
         </p>
 
-        <div className="mt-10 grid gap-3 text-left sm:grid-cols-3">
-          {[
-            { label: "Visit us", value: "Davao City, Philippines" },
-            { label: "Hours", value: "Daily 6AM - 10PM" },
-            { label: "Fastest reply", value: "Email within 24 hours" },
-          ].map((item) => (
-            <div
-              key={item.label}
-              className="border border-border-subtle bg-surface p-5"
-            >
-              <p className="label-caps text-text-secondary">{item.label}</p>
-              <p className="mt-3 text-sm leading-relaxed text-white">
-                {item.value}
-              </p>
-            </div>
-          ))}
-        </div>
+      
 
         <form
           onSubmit={(e) => {
@@ -67,12 +51,6 @@ export function FinalCTA() {
             GET STARTED
           </button>
         </form>
-
-        <p className="mt-6 text-[13px] text-text-muted">
-          {submitted
-            ? "Thanks - your details are ready to be sent once the form is wired up."
-            : "No contracts. Cancel anytime."}
-        </p>
       </motion.div>
     </section>
   );
