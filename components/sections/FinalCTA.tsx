@@ -49,6 +49,12 @@ export function FinalCTA() {
             GET STARTED
           </button>
         </form>
+
+        {submitted ? (
+          <p className="mt-4 text-sm text-gold">
+            Thanks. We&apos;ll reach out with the next steps shortly.
+          </p>
+        ) : null}
       </motion.div>
     </section>
   );

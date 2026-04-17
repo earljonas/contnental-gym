@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
+
+import { AdminSidebar } from "@/components/admin/sidebar";
+import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
-import Link from "next/link";
 import { getUserRole } from "@/lib/supabase/roles";
 
 export default async function AdminLayout({
@@ -23,47 +25,33 @@ export default async function AdminLayout({
 
   const roleInfo = await getUserRole(supabase, user.id);
 
-  // Only super admins can access
   if (roleInfo.role === "BRANCH_ADMIN") redirect("/branch");
   if (roleInfo.role !== "SUPER_ADMIN") redirect("/dashboard");
 
-  return (
-    <div className="flex min-h-screen flex-col bg-page-bg">
-      {/* Top nav */}
-      <header className="border-b border-border-subtle bg-surface">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-4">
-            <Link href="/" className="flex flex-col leading-none">
-              <span className="font-display text-lg font-black uppercase tracking-tight text-white">
-                CONTNENTAL
-              </span>
-              <span className="text-[9px] font-medium uppercase tracking-[0.2em] text-text-secondary">
-                FITNESS GYM
-              </span>
-            </Link>
-            <span className="ml-2 border border-gold bg-gold/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-gold">
-              SUPER ADMIN
-            </span>
-          </div>
+  const userName = `${profile?.first_name ?? "Super"} ${profile?.last_name ?? "Admin"}`.trim();
 
-          <div className="flex items-center gap-4">
-            <span className="text-[13px] text-text-secondary">
-              {profile?.first_name} {profile?.last_name}
-            </span>
+  return (
+    <div className="super-admin-theme min-h-screen bg-[var(--admin-shell)] text-foreground">
+      <AdminSidebar userName={userName} />
+
+      <div className="min-h-screen lg:pl-72">
+        <header className="sticky top-0 z-20 border-b border-border bg-white/90 backdrop-blur">
+          <div className="flex items-center justify-end gap-4 px-4 py-4 sm:px-6 lg:px-8">
             <form action="/auth/signout" method="post">
-              <button
-                type="submit"
-                className="text-[11px] uppercase tracking-[0.15em] text-text-secondary transition-colors hover:text-white"
+              <Button
+                variant="outline"
+                className="h-10 rounded-2xl px-4 text-xs font-semibold uppercase tracking-[0.16em]"
               >
                 Sign out
-              </button>
+              </Button>
             </form>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Content */}
-      <main className="flex-1">{children}</main>
+        <main className="min-h-[calc(100vh-73px)] bg-white px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+          <div className="mx-auto max-w-7xl">{children}</div>
+        </main>
+      </div>
     </div>
   );
 }

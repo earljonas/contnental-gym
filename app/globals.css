@@ -63,6 +63,30 @@
   --radius: 0px;
 }
 
+.super-admin-theme {
+  --background: #ffffff;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #0f172a;
+  --primary-foreground: #ffffff;
+  --secondary: #f5f7fb;
+  --secondary-foreground: #111827;
+  --muted: #f5f7fb;
+  --muted-foreground: #64748b;
+  --accent: #d4a64c;
+  --accent-foreground: #111827;
+  --destructive: #dc2626;
+  --border: #e5e7eb;
+  --input: #e5e7eb;
+  --ring: #caa24b;
+  --admin-shell: #f6f7fb;
+  --admin-sidebar: #f8fafc;
+  --admin-sidebar-foreground: #0f172a;
+}
+
 /* Noise texture SVG filter */
 svg.noise-filter {
   position: fixed;

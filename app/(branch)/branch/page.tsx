@@ -14,7 +14,6 @@ export default async function BranchPage() {
     .eq("id", user!.id)
     .single();
 
-  const branchId = profile?.branch_id;
   const branchName = (profile?.branches as Record<string, string> | null)?.name;
 
   // Fetch members associated with this branch (meaning their last attendance or branch assigned)
