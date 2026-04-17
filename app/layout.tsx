@@ -17,20 +17,20 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Continental Fitness Gym - Davao City",
+  title: "Contnental Fitness Gym - Davao City",
   description:
-    "Davao's raw, no-nonsense strength and conditioning gym. Build discipline. Build strength. Continental Fitness Gym, Davao City, Philippines.",
+    "Davao's raw, no-nonsense strength and conditioning gym. Build discipline. Build strength. Contnental Fitness Gym, Davao City, Philippines.",
   keywords: [
     "gym",
     "Davao",
     "fitness",
     "strength training",
     "conditioning",
-    "Continental Fitness",
+    "Contnental Fitness",
     "Philippines",
   ],
   openGraph: {
-    title: "Continental Fitness Gym - Davao City",
+    title: "Contnental Fitness Gym - Davao City",
     description:
       "Davao's raw strength and conditioning gym. No fluff. Just work.",
     type: "website",

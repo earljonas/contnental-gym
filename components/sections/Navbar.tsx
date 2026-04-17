@@ -50,7 +50,7 @@ export function Navbar() {
         {/* Logo */}
         <a href="#" className="flex flex-col leading-none">
           <span className="font-display text-[22px] font-black uppercase tracking-tight text-white">
-            CONTINENTAL
+            CONTNENTAL
           </span>
           <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-text-secondary">
             FITNESS GYM
@@ -70,14 +70,22 @@ export function Navbar() {
           ))}
         </div>
 
-        {/* CTA */}
-        <a
-          href="#contact"
-          className="hidden h-9 items-center bg-gold px-5 text-[12px] font-medium uppercase tracking-[0.15em] text-black transition-opacity duration-200 hover:opacity-90 md:inline-flex"
-          style={{ borderRadius: 0 }}
-        >
-          JOIN NOW
-        </a>
+        {/* Desktop CTA */}
+        <div className="hidden items-center gap-6 md:flex">
+          <a
+            href="/login"
+            className="text-[12px] font-medium uppercase tracking-[0.15em] text-white transition-opacity duration-200 hover:opacity-70"
+          >
+            LOG IN
+          </a>
+          <a
+            href="/register"
+            className="inline-flex h-9 items-center bg-gold px-5 text-[12px] font-medium uppercase tracking-[0.15em] text-black transition-opacity duration-200 hover:opacity-90"
+            style={{ borderRadius: 0 }}
+          >
+            JOIN NOW
+          </a>
+        </div>
 
         {/* Mobile hamburger */}
         <button
@@ -121,13 +129,23 @@ export function Navbar() {
               {link.label}
             </a>
           ))}
-          <a
-            href="#contact"
-            onClick={() => setMobileOpen(false)}
-            className="mt-4 inline-flex h-12 items-center bg-gold px-8 text-[13px] font-medium uppercase tracking-[0.15em] text-black"
-          >
-            JOIN NOW
-          </a>
+          
+          <div className="mt-8 flex flex-col items-center gap-5">
+            <a
+              href="/login"
+              onClick={() => setMobileOpen(false)}
+              className="text-[14px] font-medium uppercase tracking-[0.15em] text-white"
+            >
+              LOG IN
+            </a>
+            <a
+              href="/register"
+              onClick={() => setMobileOpen(false)}
+              className="mt-2 inline-flex h-12 w-48 items-center justify-center bg-gold px-8 text-[13px] font-medium uppercase tracking-[0.15em] text-black"
+            >
+              JOIN NOW
+            </a>
+          </div>
         </motion.div>
       )}
     </motion.nav>

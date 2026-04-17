@@ -20,7 +20,7 @@ export function AppPreview() {
               PROGRESS
             </h2>
             <p className="mt-6 max-w-md text-[15px] leading-relaxed text-text-secondary">
-              Every member gets access to the Continental app. Log your
+              Every member gets access to the Contnental app. Log your
               workouts, track your lifts over time, and see where you&rsquo;re
               actually improving.
             </p>
