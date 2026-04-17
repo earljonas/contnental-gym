@@ -27,8 +27,6 @@ export function FinalCTA() {
           and the best starting point based on how you want to train.
         </p>
 
-      
-
         <form
           onSubmit={(e) => {
             e.preventDefault();

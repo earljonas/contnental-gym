@@ -5,7 +5,7 @@ export function Footer() {
         {/* Logo */}
         <a href="#" className="flex flex-col leading-none">
           <span className="font-display text-[18px] font-black uppercase tracking-tight text-white">
-            CONTINENTAL
+            CONTNENTAL
           </span>
           <span className="text-[9px] font-medium uppercase tracking-[0.2em] text-text-secondary">
             FITNESS GYM
@@ -14,7 +14,7 @@ export function Footer() {
 
         {/* Copyright */}
         <p className="text-[12px] text-text-muted">
-          &copy; 2026 Continental Fitness Gym. Davao City.
+          &copy; 2026 Contnental Fitness Gym. Davao City.
         </p>
       </div>
     </footer>

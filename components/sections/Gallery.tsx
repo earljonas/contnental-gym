@@ -5,11 +5,11 @@ import { motion } from "framer-motion";
 import Image from "next/image";
 
 const galleryItems = [
-  { src: "/gym8.jpg", alt: "Continental Fitness Gym entrance and logo" },
+  { src: "/gym8.jpg", alt: "Contnental Fitness Gym entrance and logo" },
   { src: "/gym9.jpg", alt: "Machine and equipment area" },
   { src: "/mirror.jpg", alt: "Custom backlit mirror" },
   { src: "/gym10.jpg", alt: "Free weights and bench area" },
-  { src: "/gym7.jpg", alt: "Continental Prime sign and gym floor" },
+  { src: "/gym7.jpg", alt: "Contnental Prime sign and gym floor" },
   { src: "/gym11.jpg", alt: "Dumbbell rack and mirrors" },
   { src: "/gym6.jpg", alt: "Bench press and equipment room" },
   { src: "/gym12.jpg", alt: "Squat racks and dumbbell area" },

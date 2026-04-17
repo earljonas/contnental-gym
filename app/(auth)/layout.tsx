@@ -12,7 +12,7 @@ export default function AuthLayout({
       <div className="relative hidden w-1/2 lg:block">
         <Image
           src="/gym1.jpg"
-          alt="Continental Fitness Gym interior"
+          alt="Contnental Fitness Gym interior"
           fill
           className="object-cover"
           priority
@@ -25,7 +25,7 @@ export default function AuthLayout({
         <div className="absolute inset-0 z-10 flex items-center justify-center">
           <Link href="/" className="flex flex-col items-center leading-none">
             <span className="font-display text-[52px] font-black uppercase tracking-tight text-white">
-              CONTINENTAL
+              CONTNENTAL
             </span>
             <span className="text-[14px] font-medium uppercase tracking-[0.3em] text-white/60">
               FITNESS GYM
