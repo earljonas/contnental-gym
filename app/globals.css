@@ -43,48 +43,69 @@
 
 :root {
   --background: #0A0A0A;
-  --foreground: #FFFFFF;
-  --card: #1C1C1C;
-  --card-foreground: #FFFFFF;
-  --popover: #1C1C1C;
-  --popover-foreground: #FFFFFF;
-  --primary: #FFFFFF;
+  --foreground: #F0EDE8;
+  --card: #141414;
+  --card-foreground: #F0EDE8;
+  --popover: #141414;
+  --popover-foreground: #F0EDE8;
+  --primary: #F0EDE8;
   --primary-foreground: #0A0A0A;
   --secondary: #1C1C1C;
-  --secondary-foreground: #FFFFFF;
+  --secondary-foreground: #F0EDE8;
   --muted: #1C1C1C;
-  --muted-foreground: #9A9A9A;
-  --accent: #C6A75E;
+  --muted-foreground: #888480;
+  --accent: #C9973E;
   --accent-foreground: #0A0A0A;
   --destructive: #FF4444;
-  --border: #2A2A2A;
-  --input: #2A2A2A;
-  --ring: #C6A75E;
+  --border: rgba(201, 151, 62, 0.15);
+  --input: #1C1C1C;
+  --ring: #C9973E;
+  --color-gold: #C9973E;
+  --color-surface: #141414;
+  --color-section-alt: #111111;
+  --color-page-bg: #0A0A0A;
+  --color-text-secondary: #888480;
+  --color-text-muted: #555250;
+  --color-border-subtle: rgba(201, 151, 62, 0.08);
+  --sidebar: #111111;
+  --sidebar-foreground: #A8A49E;
+  --sidebar-foreground-active: #F0EDE8;
+  --sidebar-accent: #C9973E;
+  --sidebar-hover: rgba(255, 255, 255, 0.06);
   --radius: 0px;
 }
 
-.super-admin-theme {
-  --background: #ffffff;
-  --foreground: #0f172a;
-  --card: #ffffff;
-  --card-foreground: #0f172a;
-  --popover: #ffffff;
-  --popover-foreground: #0f172a;
-  --primary: #0f172a;
-  --primary-foreground: #ffffff;
-  --secondary: #f5f7fb;
-  --secondary-foreground: #111827;
-  --muted: #f5f7fb;
-  --muted-foreground: #64748b;
-  --accent: #d4a64c;
-  --accent-foreground: #111827;
-  --destructive: #dc2626;
-  --border: #e5e7eb;
-  --input: #e5e7eb;
-  --ring: #caa24b;
-  --admin-shell: #f6f7fb;
-  --admin-sidebar: #f8fafc;
-  --admin-sidebar-foreground: #0f172a;
+.light {
+  --background: #F5F5F0;
+  --foreground: #111111;
+  --card: #FFFFFF;
+  --card-foreground: #111111;
+  --popover: #FFFFFF;
+  --popover-foreground: #111111;
+  --primary: #111111;
+  --primary-foreground: #F5F4F0;
+  --secondary: #EFEFED;
+  --secondary-foreground: #111111;
+  --muted: #EFEFED;
+  --muted-foreground: #6B6860;
+  --accent: #C9973E;
+  --accent-foreground: #111111;
+  --destructive: #DC2626;
+  --border: #E2E0DC;
+  --input: #E2E0DC;
+  --ring: #C9973E;
+  --color-gold: #C9973E;
+  --color-surface: #FFFFFF;
+  --color-section-alt: #EFEFED;
+  --color-page-bg: #F5F4F0;
+  --color-text-secondary: #6B6860;
+  --color-text-muted: #9A9894;
+  --color-border-subtle: #ECEAE6;
+  --sidebar: #111111;
+  --sidebar-foreground: #A8A49E;
+  --sidebar-foreground-active: #F0EDE8;
+  --sidebar-accent: #C9973E;
+  --sidebar-hover: rgba(255, 255, 255, 0.06);
 }
 
 /* Noise texture SVG filter */
@@ -118,6 +139,25 @@ svg.noise-filter {
     letter-spacing: 0.15em;
     font-weight: 500;
     text-transform: uppercase;
+  }
+
+  .badge-pending {
+    background: rgba(201, 151, 62, 0.12);
+    color: #C9973E;
+    border: 1px solid rgba(201, 151, 62, 0.3);
+  }
+
+  .badge-active {
+    background: rgba(74, 222, 128, 0.12);
+    color: #4ADE80;
+    border: 1px solid rgba(74, 222, 128, 0.3);
+  }
+
+  .badge-expired,
+  .badge-cancelled {
+    background: rgba(248, 113, 113, 0.12);
+    color: #F87171;
+    border: 1px solid rgba(248, 113, 113, 0.3);
   }
 
   /* Section title style */

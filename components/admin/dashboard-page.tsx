@@ -51,23 +51,25 @@ export function DashboardPage({
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {metrics.map((metric) => (
-            <Card key={metric.label} className="overflow-hidden">
-              <CardHeader className="pb-3">
-                <CardDescription className="text-xs font-semibold uppercase tracking-[0.16em]">
+            <Card key={metric.label} className="overflow-hidden rounded-[28px]">
+              <CardHeader className="gap-5 p-6">
+                <CardDescription className="text-[11px] font-semibold uppercase tracking-[0.18em]">
                   {metric.label}
                 </CardDescription>
-                <div className="flex items-end justify-between gap-4">
-                  <CardTitle className="font-display text-4xl font-black uppercase tracking-tight">
+                <div className="flex min-h-20 flex-col justify-between gap-4">
+                  <CardTitle className="font-display text-[clamp(2.5rem,3vw,3.4rem)] font-black uppercase leading-none tracking-tight">
                     {metric.value}
                   </CardTitle>
-                  <span className={cn("flex items-center gap-1 text-sm font-semibold", metricTone(metric.trend))}>
-                    {metric.trend === "down" ? (
-                      <ArrowDownRight className="size-4" />
-                    ) : (
-                      <ArrowUpRight className="size-4" />
-                    )}
-                    {metric.delta}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className={cn("flex items-center gap-1 text-sm font-semibold", metricTone(metric.trend))}>
+                      {metric.trend === "down" ? (
+                        <ArrowDownRight className="size-4" />
+                      ) : (
+                        <ArrowUpRight className="size-4" />
+                      )}
+                      {metric.delta}
+                    </span>
+                  </div>
                 </div>
               </CardHeader>
             </Card>

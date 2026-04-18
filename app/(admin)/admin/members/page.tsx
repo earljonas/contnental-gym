@@ -18,18 +18,22 @@ export default async function MembersPage() {
       columns={[
         { header: "Name", key: "name" },
         { header: "Email", key: "email" },
-        { header: "Branch", key: "branch" },
         { header: "Plan", key: "plan" },
         { header: "Status", key: "status" },
         { header: "Joined", key: "joined" },
+        {
+          header: "Actions",
+          id: "actions",
+          key: "email",
+          cellType: "email-action",
+        },
       ]}
       rows={overview.members}
       searchPlaceholder="Search name or email"
-      searchKeys={["name", "email", "branch", "plan"]}
+      searchKeys={["name", "email", "plan"]}
       filters={[
         { key: "status", label: "Status", options: ["Active", "Pending", "At Risk", "Inactive"] },
         { key: "plan", label: "Plan", options: [...new Set(overview.members.map((item) => item.plan))] },
-        { key: "branch", label: "Branch", options: [...new Set(overview.members.map((item) => item.branch))] },
       ]}
       dateKey="joined"
     />

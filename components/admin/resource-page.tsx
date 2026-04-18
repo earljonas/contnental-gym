@@ -11,7 +11,9 @@ type Summary = {
 
 type Column<T> = {
   header: string;
-  key: keyof T;
+  key?: keyof T;
+  id?: string;
+  cellType?: "text" | "status" | "email-action";
 };
 
 export function ResourcePage<T extends Record<string, string>>({
@@ -48,12 +50,12 @@ export function ResourcePage<T extends Record<string, string>>({
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {summary.map((item) => (
-            <Card key={item.label}>
-              <CardHeader className="pb-3">
-                <CardDescription className="text-xs font-semibold uppercase tracking-[0.16em]">
+            <Card key={item.label} className="rounded-[28px]">
+              <CardHeader className="gap-4 p-6">
+                <CardDescription className="text-[11px] font-semibold uppercase tracking-[0.18em]">
                   {item.label}
                 </CardDescription>
-                <CardTitle className="font-display text-4xl font-black uppercase tracking-tight">
+                <CardTitle className="font-display text-[clamp(2.35rem,3vw,3.2rem)] font-black uppercase leading-none tracking-tight">
                   {item.value}
                 </CardTitle>
               </CardHeader>
@@ -61,14 +63,14 @@ export function ResourcePage<T extends Record<string, string>>({
           ))}
         </div>
 
-        <Card>
-          <CardHeader className="flex-row items-start justify-between space-y-0">
+        <Card className="rounded-[30px]">
+          <CardHeader className="flex-col gap-4 border-b border-border/70 p-6 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
             <CardTitle>{tableTitle}</CardTitle>
-            <Button variant="outline" className="rounded-2xl text-xs font-semibold uppercase tracking-[0.16em]">
+            <Button variant="outline" className="h-11 rounded-2xl px-5 text-xs font-semibold uppercase tracking-[0.16em]">
               Export
             </Button>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-6">
             <ResourceTable
               columns={columns}
               rows={rows}

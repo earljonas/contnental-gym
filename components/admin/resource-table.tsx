@@ -1,7 +1,7 @@
 "use client";
 
 import { startTransition, useDeferredValue, useState } from "react";
-import { ArrowUpDown, Search } from "lucide-react";
+import { ArrowUpDown, CalendarRange, RotateCcw, Search, SlidersHorizontal } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,9 @@ import {
 
 type Column<T> = {
   header: string;
-  key: keyof T;
+  id?: string;
+  key?: keyof T;
+  cellType?: "text" | "status" | "email-action";
 };
 
 type FilterConfig<T> = {
@@ -29,6 +31,16 @@ type FilterConfig<T> = {
 
 function isDateValue(value: string) {
   return !Number.isNaN(Date.parse(value));
+}
+
+function statusBadgeClass(value: string) {
+  const normalized = value.trim().toLowerCase();
+
+  if (normalized === "active") return "badge-active";
+  if (normalized === "pending") return "badge-pending";
+  if (normalized === "expired" || normalized === "cancelled") return "badge-expired";
+
+  return "";
 }
 
 export function ResourceTable<T extends Record<string, string>>({
@@ -53,6 +65,30 @@ export function ResourceTable<T extends Record<string, string>>({
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const deferredSearch = useDeferredValue(search);
+  const availableFilters = filters
+    .map((filter) => ({
+      ...filter,
+      options: [...new Set(filter.options.map((option) => option.trim()).filter(Boolean))],
+    }))
+    .filter((filter) => filter.options.length > 1);
+  const dateColumnLabel = dateKey
+    ? columns.find((column) => column.key === dateKey)?.header ?? "Date"
+    : null;
+  const hasActiveState =
+    search.trim().length > 0 ||
+    dateFrom.length > 0 ||
+    dateTo.length > 0 ||
+    sortKey !== "" ||
+    Object.values(activeFilters).some((value) => value && value !== "All");
+
+  function resetControls() {
+    setSearch("");
+    setActiveFilters({});
+    setSortKey("");
+    setSortDirection("asc");
+    setDateFrom("");
+    setDateTo("");
+  }
 
   let filteredRows = rows.filter((row) => {
     const matchesSearch =
@@ -63,7 +99,7 @@ export function ResourceTable<T extends Record<string, string>>({
 
     if (!matchesSearch) return false;
 
-    const matchesFilters = filters.every((filter) => {
+    const matchesFilters = availableFilters.every((filter) => {
       const filterValue = activeFilters[String(filter.key)];
       return !filterValue || filterValue === "All" || row[filter.key] === filterValue;
     });
@@ -103,93 +139,148 @@ export function ResourceTable<T extends Record<string, string>>({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex flex-1 flex-col gap-3 sm:flex-row">
-          <div className="relative min-w-[240px] flex-1 xl:max-w-sm">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder={searchPlaceholder}
-              className="h-11 rounded-2xl pl-9"
-            />
+    <div className="space-y-5">
+      <div className="rounded-[26px] border border-border bg-secondary/35 p-4 sm:p-5">
+        <div className="space-y-4">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              <Search className="size-3.5" />
+              Search
+            </div>
+            <div className="relative min-w-[240px] max-w-2xl">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder={searchPlaceholder}
+                className="h-12 rounded-2xl border-border bg-background pl-10 text-sm"
+              />
+            </div>
           </div>
 
-          {filters.map((filter) => (
-            <Select
-              key={String(filter.key)}
-              value={activeFilters[String(filter.key)] ?? "All"}
-              onChange={(event) => {
-                startTransition(() => {
-                  setActiveFilters((current) => ({
-                    ...current,
-                    [String(filter.key)]: event.target.value,
-                  }));
-                });
-              }}
-              className="min-w-[160px]"
-            >
-              <option value="All">{filter.label}</option>
-              {filter.options.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              <SlidersHorizontal className="size-3.5" />
+              Filters & Sort
+            </div>
+            <div className="flex flex-wrap items-end gap-3">
+              {availableFilters.map((filter) => (
+                <div key={String(filter.key)} className="min-w-[180px] flex-1 sm:flex-none sm:basis-[200px]">
+                  <label className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    {filter.label}
+                  </label>
+                  <Select
+                    value={activeFilters[String(filter.key)] ?? "All"}
+                    onChange={(event) => {
+                      startTransition(() => {
+                        setActiveFilters((current) => ({
+                          ...current,
+                          [String(filter.key)]: event.target.value,
+                        }));
+                      });
+                    }}
+                    className="h-12 min-w-0 rounded-2xl border-border bg-background"
+                  >
+                    <option value="All">All {filter.label}</option>
+                    {filter.options.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
               ))}
-            </Select>
-          ))}
-        </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row">
-          {dateKey ? (
-            <>
-              <Input
-                type="date"
-                value={dateFrom}
-                onChange={(event) => setDateFrom(event.target.value)}
-                className="h-11 rounded-2xl"
-              />
-              <Input
-                type="date"
-                value={dateTo}
-                onChange={(event) => setDateTo(event.target.value)}
-                className="h-11 rounded-2xl"
-              />
-            </>
-          ) : null}
+              {dateKey ? (
+                <div className="min-w-[280px] flex-1 sm:flex-none sm:basis-[320px]">
+                  <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    <CalendarRange className="size-3.5" />
+                    {dateColumnLabel} Range
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="relative">
+                      <CalendarRange className="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        type="date"
+                        aria-label={`${dateColumnLabel} from`}
+                        value={dateFrom}
+                        onChange={(event) => setDateFrom(event.target.value)}
+                        className="h-12 rounded-2xl border-border bg-background pl-10"
+                      />
+                    </div>
+                    <div className="relative">
+                      <CalendarRange className="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        type="date"
+                        aria-label={`${dateColumnLabel} to`}
+                        value={dateTo}
+                        onChange={(event) => setDateTo(event.target.value)}
+                        className="h-12 rounded-2xl border-border bg-background pl-10"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : null}
 
-          <div className="flex gap-2">
-            <Select
-              value={String(sortKey)}
-              onChange={(event) => setSortKey(event.target.value as keyof T | "")}
-              className="min-w-[160px]"
-            >
-              <option value="">Sort by</option>
-              {columns.map((column) => (
-                <option key={String(column.key)} value={String(column.key)}>
-                  {column.header}
-                </option>
-              ))}
-            </Select>
-            <Button
-              type="button"
-              variant="outline"
-              className="h-11 rounded-2xl px-4"
-              onClick={() =>
-                setSortDirection((current) => (current === "asc" ? "desc" : "asc"))
-              }
-            >
-              <ArrowUpDown className="size-4" />
-            </Button>
+              <div className="min-w-[220px] flex-1 sm:flex-none sm:basis-[240px]">
+                <label className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Sort
+                </label>
+                <div className="flex gap-2">
+                  <Select
+                    value={String(sortKey)}
+                    onChange={(event) => setSortKey(event.target.value as keyof T | "")}
+                    className="h-12 min-w-0 rounded-2xl border-border bg-background"
+                  >
+                    <option value="">Sort by</option>
+                    {columns
+                      .filter((column) => column.key)
+                      .map((column) => (
+                        <option key={column.id ?? String(column.key)} value={String(column.key)}>
+                          {column.header}
+                        </option>
+                      ))}
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-12 rounded-2xl px-4"
+                    onClick={() =>
+                      setSortDirection((current) => (current === "asc" ? "desc" : "asc"))
+                    }
+                    aria-label={`Sort ${sortDirection === "asc" ? "ascending" : "descending"}`}
+                  >
+                    <ArrowUpDown className="size-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border/70 pt-3">
+              {hasActiveState ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-10 rounded-2xl px-4 text-xs font-semibold uppercase tracking-[0.16em]"
+                  onClick={resetControls}
+                >
+                  <RotateCcw className="size-4" />
+                  Reset
+                </Button>
+              ) : null}
+              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                Direction: {sortDirection === "asc" ? "Ascending" : "Descending"}
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
-      <Table>
+      <Table className="min-w-[720px]">
         <TableHeader>
-          <TableRow>
+          <TableRow className="hover:bg-transparent">
             {columns.map((column) => (
-              <TableHead key={String(column.key)}>{column.header}</TableHead>
+              <TableHead key={column.id ?? String(column.key)}>{column.header}</TableHead>
             ))}
           </TableRow>
         </TableHeader>
@@ -198,7 +289,7 @@ export function ResourceTable<T extends Record<string, string>>({
             <TableRow>
               <TableCell
                 colSpan={columns.length}
-                className="py-10 text-center text-sm text-muted-foreground"
+                className="py-16 text-center text-sm text-muted-foreground"
               >
                 No results
               </TableCell>
@@ -207,14 +298,26 @@ export function ResourceTable<T extends Record<string, string>>({
             filteredRows.map((row, rowIndex) => (
               <TableRow key={rowIndex}>
                 {columns.map((column) => {
-                  const value = row[column.key];
+                  const value = column.key ? row[column.key] : "";
                   const isStatus =
+                    column.cellType === "status" ||
                     column.header.toLowerCase().includes("status") ||
                     column.header.toLowerCase().includes("risk");
+                  const isEmailAction = column.cellType === "email-action";
 
                   return (
-                    <TableCell key={String(column.key)}>
-                      {isStatus ? <Badge variant="secondary">{value}</Badge> : value}
+                    <TableCell key={column.id ?? String(column.key)} className="text-[15px]">
+                      {isEmailAction ? (
+                        <Button asChild variant="outline" className="h-9 rounded-full px-3.5 text-[11px] font-semibold uppercase tracking-[0.16em]">
+                          <a href={`mailto:${value}`}>Email</a>
+                        </Button>
+                      ) : isStatus ? (
+                        <Badge variant="secondary" className={statusBadgeClass(value)}>
+                          {value}
+                        </Badge>
+                      ) : (
+                        value
+                      )}
                     </TableCell>
                   );
                 })}
