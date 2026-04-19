@@ -1,4 +1,4 @@
-import { ArrowDownRight, ArrowUpRight, BellDot, Sparkles } from "lucide-react";
+import { ArrowDownRight, ArrowRight, ArrowUpRight, BellDot, Sparkles } from "lucide-react";
 
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { AdminPageTransition } from "@/components/admin/page-transition";
@@ -64,8 +64,10 @@ export function DashboardPage({
                     <span className={cn("flex items-center gap-1 text-sm font-semibold", metricTone(metric.trend))}>
                       {metric.trend === "down" ? (
                         <ArrowDownRight className="size-4" />
-                      ) : (
+                      ) : metric.trend === "up" ? (
                         <ArrowUpRight className="size-4" />
+                      ) : (
+                        <ArrowRight className="size-4" />
                       )}
                       {metric.delta}
                     </span>
@@ -152,7 +154,12 @@ export function DashboardPage({
         <Card>
           <CardHeader className="gap-4 md:flex-row md:items-center md:justify-between">
             <CardTitle>Billing</CardTitle>
-            <Button variant="outline" className="h-11 rounded-2xl px-5 text-xs font-semibold uppercase tracking-[0.16em]">
+            <Button
+              variant="outline"
+              className="h-11 rounded-2xl px-5 text-xs font-semibold uppercase tracking-[0.16em]"
+              disabled
+              title="Coming soon"
+            >
               <BellDot className="size-4" />
               Notify
             </Button>

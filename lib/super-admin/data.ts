@@ -316,7 +316,7 @@ const fallbackData: OverviewData = {
     {
       title: "New recovery area opening",
       audience: "Extreme members",
-      channel: "Draft",
+      channel: "Portal",
       status: "Draft",
       publishAt: "TBD",
     },
@@ -332,6 +332,12 @@ function statusFromMembership(status?: string): MemberRow["status"] {
   if (status === "PENDING") return "Pending";
   if (status === "CANCELLED" || status === "EXPIRED") return "Inactive";
   return "At Risk";
+}
+
+const OVERDUE_CUTOFF_MS = 3 * 24 * 60 * 60 * 1000;
+
+function isOverdue(dateStr: string): boolean {
+  return Date.now() - new Date(dateStr).getTime() > OVERDUE_CUTOFF_MS;
 }
 
 export async function getSuperAdminOverview(): Promise<OverviewData> {
@@ -376,6 +382,12 @@ export async function getSuperAdminOverview(): Promise<OverviewData> {
       attendanceResult.error ||
       branchesResult.error
     ) {
+      if (profilesResult.error) console.error("[getSuperAdminOverview] profiles query failed:", profilesResult.error);
+      if (membershipsResult.error) console.error("[getSuperAdminOverview] memberships query failed:", membershipsResult.error);
+      if (plansResult.error) console.error("[getSuperAdminOverview] plans query failed:", plansResult.error);
+      if (paymentsResult.error) console.error("[getSuperAdminOverview] payments query failed:", paymentsResult.error);
+      if (attendanceResult.error) console.error("[getSuperAdminOverview] attendance query failed:", attendanceResult.error);
+      if (branchesResult.error) console.error("[getSuperAdminOverview] branches query failed:", branchesResult.error);
       return fallbackData;
     }
 
@@ -388,7 +400,9 @@ export async function getSuperAdminOverview(): Promise<OverviewData> {
 
     const members = profiles.filter((profile) => profile.role === "MEMBER");
     const activeMembers = memberships.filter((membership) => membership.status === "ACTIVE");
-    const overduePayments = payments.filter((payment) => payment.status === "PENDING");
+    const overduePayments = payments.filter(
+      (payment) => payment.status === "PENDING" && isOverdue(payment.created_at)
+    );
     const revenue = payments
       .filter((payment) => payment.status === "CONFIRMED")
       .reduce((total, payment) => total + Number(payment.amount ?? 0), 0);
@@ -402,7 +416,11 @@ export async function getSuperAdminOverview(): Promise<OverviewData> {
       }
     }
 
-    const liveMembers: MemberRow[] = members.slice(0, 6).map((member) => {
+    const sortedMembers = [...members].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+
+    const liveMembers: MemberRow[] = sortedMembers.slice(0, 6).map((member) => {
       const latestMembership = latestMembershipByUser.get(member.id);
       const relatedBranch = Array.isArray(member.branches) ? member.branches[0] : member.branches;
 
@@ -451,13 +469,15 @@ export async function getSuperAdminOverview(): Promise<OverviewData> {
       };
     });
 
+    const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+
     const livePayments: PaymentRow[] = payments.slice(0, 6).map((payment) => {
-      const member = profiles.find((profile) => profile.id === payment.user_id);
+      const member = profileById.get(payment.user_id);
       return {
         member: member ? `${member.first_name} ${member.last_name}` : "Member",
-        branch: branchNameById.get(member?.branch_id ?? -1) ?? "Branch",
+        branch: branchNameById.get(member?.branch_id ?? -1) ?? "Unknown Branch",
         amount: formatCurrency(Number(payment.amount ?? 0)),
-        method: payment.payment_method,
+        method: payment.payment_method ?? "Unknown",
         dueDate: new Date(payment.created_at).toLocaleDateString("en-US", {
           month: "short",
           day: "numeric",
@@ -466,7 +486,7 @@ export async function getSuperAdminOverview(): Promise<OverviewData> {
         status:
           payment.status === "CONFIRMED"
             ? "Confirmed"
-            : payment.created_at < new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
+            : isOverdue(payment.created_at)
               ? "Overdue"
               : "Pending",
       };
@@ -525,7 +545,8 @@ export async function getSuperAdminOverview(): Promise<OverviewData> {
       retention: fallbackData.retention,
       announcements: fallbackData.announcements,
     };
-  } catch {
+  } catch (error) {
+    console.error("[getSuperAdminOverview] Unexpected error:", error);
     return fallbackData;
   }
 }

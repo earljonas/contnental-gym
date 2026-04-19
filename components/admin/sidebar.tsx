@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { PanelLeftClose, PanelLeftOpen, UserRound, X } from "lucide-react";
 import { motion } from "framer-motion";
+import { useEffect, useCallback } from "react";
 
 import { getAdminNav } from "@/components/admin/navigation";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,20 @@ export function AdminSidebar({
 }) {
   const pathname = usePathname();
   const navItems = getAdminNav(role);
+
+  const isNavActive = useCallback((href: string) => {
+    if (href === "/admin") return pathname === "/admin";
+    return pathname === href || pathname.startsWith(`${href}/`);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCloseMobile();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onCloseMobile]);
 
   return (
     <>
@@ -92,7 +107,7 @@ export function AdminSidebar({
 
         <nav className={cn("flex-1 space-y-2 overflow-y-auto py-6", isCollapsed ? "px-3" : "px-4")}>
           {navItems.map((item) => {
-            const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+            const active = isNavActive(item.href);
             const Icon = item.icon;
 
             return (
@@ -167,6 +182,9 @@ export function AdminSidebar({
       </div>
 
       <aside
+        role="dialog"
+        aria-modal="true"
+        aria-label="Navigation menu"
         className={cn(
           "fixed inset-y-0 left-0 z-30 w-[88vw] max-w-sm border-r border-white/10 bg-[var(--sidebar)] p-4 shadow-2xl transition-transform duration-300 ease-out lg:hidden",
           isOpen ? "translate-x-0" : "-translate-x-full"
@@ -188,7 +206,7 @@ export function AdminSidebar({
 
         <div className="mt-5 flex flex-col gap-2">
           {navItems.map((item) => {
-            const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+            const active = isNavActive(item.href);
             return (
               <Link
                 key={item.href}

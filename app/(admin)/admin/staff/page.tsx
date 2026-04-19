@@ -28,7 +28,7 @@ export default async function StaffPage() {
       filters={[
         { key: "role", label: "Role", options: ["Owner", "Manager", "Receptionist"] },
         { key: "status", label: "Status", options: ["Active", "Invited"] },
-        { key: "branch", label: "Branch", options: [...new Set(overview.staff.map((item) => item.branch))] },
+        { key: "branch", label: "Branch", options: [...new Set(overview.staff.map((item) => item.branch).filter((b) => b && b !== "All branches"))] },
       ]}
     />
   );

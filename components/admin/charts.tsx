@@ -85,7 +85,7 @@ export function TrendLineChart({
         </motion.svg>
       </div>
 
-      <div className={`grid gap-2 text-xs text-muted-foreground ${data.length > 6 ? "grid-cols-7" : "grid-cols-6"}`}>
+      <div className="grid gap-2 text-xs text-muted-foreground" style={{ gridTemplateColumns: `repeat(${data.length}, minmax(0, 1fr))` }}>
         {data.map((item) => (
           <div key={item.label} className="space-y-1">
             <p className="font-medium text-foreground">{item.label}</p>

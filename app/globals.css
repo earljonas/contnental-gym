@@ -57,7 +57,7 @@
   --accent: #C9973E;
   --accent-foreground: #0A0A0A;
   --destructive: #FF4444;
-  --border: rgba(201, 151, 62, 0.15);
+  --border: rgba(240, 237, 232, 0.08);
   --input: #1C1C1C;
   --ring: #C9973E;
   --color-gold: #C9973E;
@@ -160,6 +160,26 @@ svg.noise-filter {
     border: 1px solid rgba(248, 113, 113, 0.3);
   }
 
+  /* Light mode badge overrides for WCAG contrast */
+  .light .badge-pending {
+    background: rgba(201, 151, 62, 0.10);
+    color: #7A4F00;
+    border: 1px solid rgba(201, 151, 62, 0.25);
+  }
+
+  .light .badge-active {
+    background: rgba(22, 101, 52, 0.08);
+    color: #166534;
+    border: 1px solid rgba(22, 101, 52, 0.2);
+  }
+
+  .light .badge-expired,
+  .light .badge-cancelled {
+    background: rgba(153, 27, 27, 0.08);
+    color: #991B1B;
+    border: 1px solid rgba(153, 27, 27, 0.2);
+  }
+
   /* Section title style */
   .section-title {
     font-size: clamp(40px, 5vw, 72px);
@@ -203,6 +223,7 @@ svg.noise-filter {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
@@ -213,6 +234,7 @@ svg.noise-filter {
   0% {
     transform: translateX(0);
   }
+
   100% {
     transform: translateX(-50%);
   }

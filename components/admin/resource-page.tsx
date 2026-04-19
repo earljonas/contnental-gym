@@ -66,7 +66,7 @@ export function ResourcePage<T extends Record<string, string>>({
         <Card className="rounded-[30px]">
           <CardHeader className="flex-col gap-4 border-b border-border/70 p-6 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
             <CardTitle>{tableTitle}</CardTitle>
-            <Button variant="outline" className="h-11 rounded-2xl px-5 text-xs font-semibold uppercase tracking-[0.16em]">
+            <Button variant="outline" className="h-11 rounded-2xl px-5 text-xs font-semibold uppercase tracking-[0.16em]" disabled title="Coming soon">
               Export
             </Button>
           </CardHeader>

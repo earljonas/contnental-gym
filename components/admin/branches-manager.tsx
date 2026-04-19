@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect, useCallback } from "react";
 import { MapPin, Users, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -51,6 +51,17 @@ export function BranchesManager({
     setErrorMessage("");
     setEditingBranch(null);
   }
+
+  const stableCloseEditor = useCallback(closeEditor, [isPending]);
+
+  useEffect(() => {
+    if (!editingBranch) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") stableCloseEditor();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [editingBranch, stableCloseEditor]);
 
   function updateField(field: "name" | "location", value: string) {
     setEditingBranch((current) => (current ? { ...current, [field]: value } : current));
@@ -140,14 +151,19 @@ export function BranchesManager({
         </div>
 
         {editingBranch ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+          <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="branch-editor-title"
+        >
             <div className="w-full max-w-lg rounded-[28px] border border-border bg-card p-6 shadow-2xl">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                     Edit branch
                   </p>
-                  <h2 className="mt-2 font-display text-3xl font-black uppercase tracking-tight text-foreground">
+                  <h2 id="branch-editor-title" className="mt-2 font-display text-3xl font-black uppercase tracking-tight text-foreground">
                     {editingBranch.name}
                   </h2>
                 </div>

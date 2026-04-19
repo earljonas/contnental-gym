@@ -33,6 +33,13 @@ function isDateValue(value: string) {
   return !Number.isNaN(Date.parse(value));
 }
 
+function normalizeToYMD(value: string): string | null {
+  const ms = Date.parse(value);
+  if (Number.isNaN(ms)) return null;
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function statusBadgeClass(value: string) {
   const normalized = value.trim().toLowerCase();
 
@@ -101,7 +108,9 @@ export function ResourceTable<T extends Record<string, string>>({
 
     const matchesFilters = availableFilters.every((filter) => {
       const filterValue = activeFilters[String(filter.key)];
-      return !filterValue || filterValue === "All" || row[filter.key] === filterValue;
+      if (!filterValue || filterValue === "All") return true;
+      const rowValue = String(row[filter.key] ?? "").trim();
+      return rowValue === filterValue;
     });
 
     if (!matchesFilters) return false;
@@ -109,15 +118,11 @@ export function ResourceTable<T extends Record<string, string>>({
     if (!dateKey || (!dateFrom && !dateTo)) return true;
 
     const rawDate = row[dateKey];
-    if (!isDateValue(rawDate)) return true;
+    const rowYMD = normalizeToYMD(rawDate);
+    if (!rowYMD) return false;
 
-    const rowDate = new Date(rawDate);
-    if (dateFrom && rowDate < new Date(dateFrom)) return false;
-    if (dateTo) {
-      const end = new Date(dateTo);
-      end.setHours(23, 59, 59, 999);
-      if (rowDate > end) return false;
-    }
+    if (dateFrom && rowYMD < dateFrom) return false;
+    if (dateTo && rowYMD > dateTo) return false;
 
     return true;
   });

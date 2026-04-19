@@ -13,7 +13,7 @@ type RoleLookupResult = {
 type RoleQueryBuilder = {
   select: (columns: string) => {
     eq: (column: "user_id" | "id", value: string) => {
-      maybeSingle: () => Promise<RoleLookupResult>;
+      maybeSingle: () => PromiseLike<RoleLookupResult>;
     };
   };
 };

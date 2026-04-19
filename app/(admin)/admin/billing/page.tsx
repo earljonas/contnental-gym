@@ -28,8 +28,8 @@ export default async function BillingPage() {
       searchKeys={["member", "branch", "amount", "method"]}
       filters={[
         { key: "status", label: "Status", options: ["Confirmed", "Pending", "Overdue"] },
-        { key: "branch", label: "Branch", options: [...new Set(overview.payments.map((item) => item.branch))] },
-        { key: "method", label: "Method", options: [...new Set(overview.payments.map((item) => item.method))] },
+        { key: "branch", label: "Branch", options: [...new Set(overview.payments.map((item) => item.branch).filter(Boolean))] },
+        { key: "method", label: "Method", options: [...new Set(overview.payments.map((item) => item.method).filter(Boolean))] },
       ]}
       dateKey="dueDate"
     />
