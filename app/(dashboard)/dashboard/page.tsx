@@ -57,7 +57,7 @@ export default async function DashboardPage() {
             CURRENT PLAN
           </h3>
           <p className="mt-3 font-display text-xl font-black uppercase text-gold">
-            {(membership?.membership_plans as Record<string, string>)?.name || "—"}
+            {(membership?.membership_plans as unknown as Record<string, string>)?.name || "—"}
           </p>
         </div>
 
@@ -66,8 +66,8 @@ export default async function DashboardPage() {
             MONTHLY RATE
           </h3>
           <p className="mt-3 font-display text-xl font-black text-white">
-            {(membership?.membership_plans as Record<string, number>)?.price
-              ? `₱${Number((membership?.membership_plans as Record<string, number>).price).toLocaleString()}`
+            {(membership?.membership_plans as unknown as Record<string, number>)?.price
+              ? `₱${Number((membership?.membership_plans as unknown as Record<string, number>).price).toLocaleString()}`
               : "—"}
           </p>
         </div>

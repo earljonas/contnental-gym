@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useEffect, useCallback } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
 
@@ -28,7 +28,7 @@ export function Gallery() {
   const items = [...galleryItems, ...galleryItems];
 
   // Auto-scroll loop
-  const animate = useCallback(() => {
+  const animate = useEffectEvent(() => {
     const track = trackRef.current;
     if (track && !isDragging) {
       track.scrollLeft += 0.6;
@@ -39,15 +39,19 @@ export function Gallery() {
         track.scrollLeft -= halfWidth;
       }
     }
-    animRef.current = requestAnimationFrame(animate);
-  }, [isDragging]);
+  });
 
   useEffect(() => {
-    animRef.current = requestAnimationFrame(animate);
+    const loop = () => {
+      animate();
+      animRef.current = requestAnimationFrame(loop);
+    };
+
+    animRef.current = requestAnimationFrame(loop);
     return () => {
       if (animRef.current) cancelAnimationFrame(animRef.current);
     };
-  }, [animate]);
+  }, [isDragging]);
 
   // Mouse drag handlers
   const onMouseDown = (e: React.MouseEvent) => {

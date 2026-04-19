@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 
 export function FinalCTA() {
+  const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
   return (
@@ -27,9 +28,11 @@ export function FinalCTA() {
           and the best starting point based on how you want to train.
         </p>
 
+        {/* TODO: POST email to backend endpoint, handle loading/error states, only setSubmitted on success */}
         <form
           onSubmit={(e) => {
             e.preventDefault();
+            if (!email.trim()) return;
             setSubmitted(true);
           }}
           className="mt-10 flex flex-col gap-3 sm:flex-row sm:gap-0"
@@ -37,7 +40,10 @@ export function FinalCTA() {
           <input
             type="email"
             placeholder="Your email address"
+            aria-label="Email address"
             required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             className="h-12 flex-1 border border-border-subtle bg-surface px-5 text-[14px] text-white placeholder:text-text-muted outline-none transition-colors duration-200 focus:border-white sm:border-r-0"
             style={{ borderRadius: 0 }}
           />
@@ -49,6 +55,12 @@ export function FinalCTA() {
             GET STARTED
           </button>
         </form>
+
+        {submitted ? (
+          <p className="mt-4 text-sm text-gold">
+            Thanks. We&apos;ll reach out with the next steps shortly.
+          </p>
+        ) : null}
       </motion.div>
     </section>
   );
