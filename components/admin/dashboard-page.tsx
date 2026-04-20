@@ -151,48 +151,6 @@ export function DashboardPage({
           </Card>
         </div>
 
-        <Card>
-          <CardHeader className="gap-4 md:flex-row md:items-center md:justify-between">
-            <CardTitle>Billing</CardTitle>
-            <Button
-              variant="outline"
-              className="h-11 rounded-2xl px-5 text-xs font-semibold uppercase tracking-[0.16em]"
-              disabled
-              title="Coming soon"
-            >
-              <BellDot className="size-4" />
-              Notify
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <ResourceTable
-              columns={[
-                { header: "Member", key: "member" },
-                { header: "Branch", key: "branch" },
-                { header: "Amount", key: "amount" },
-                { header: "Method", key: "method" },
-                { header: "Due Date", key: "dueDate" },
-                { header: "Status", key: "status" },
-              ]}
-              rows={payments}
-              searchPlaceholder="Search member"
-              searchKeys={["member", "branch", "amount"]}
-              filters={[
-                {
-                  key: "status",
-                  label: "Status",
-                  options: ["Confirmed", "Pending", "Overdue"],
-                },
-                {
-                  key: "branch",
-                  label: "Branch",
-                  options: [...new Set(payments.map((item) => item.branch))],
-                },
-              ]}
-              dateKey="dueDate"
-            />
-          </CardContent>
-        </Card>
       </div>
     </AdminPageTransition>
   );

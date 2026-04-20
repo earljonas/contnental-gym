@@ -146,137 +146,98 @@ export function ResourceTable<T extends Record<string, string>>({
   return (
     <div className="space-y-5">
       <div className="rounded-[26px] border border-border bg-secondary/35 p-4 sm:p-5">
-        <div className="space-y-4">
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              <Search className="size-3.5" />
-              Search
-            </div>
-            <div className="relative min-w-[240px] max-w-2xl">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder={searchPlaceholder}
-                className="h-12 rounded-2xl border-border bg-background pl-10 text-sm"
-              />
-            </div>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:flex-wrap">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder={searchPlaceholder}
+              className="h-10 w-full rounded-xl border-border bg-background pl-10 text-sm"
+            />
           </div>
 
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              <SlidersHorizontal className="size-3.5" />
-              Filters & Sort
-            </div>
-            <div className="flex flex-wrap items-end gap-3">
-              {availableFilters.map((filter) => (
-                <div key={String(filter.key)} className="min-w-[180px] flex-1 sm:flex-none sm:basis-[200px]">
-                  <label className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    {filter.label}
-                  </label>
-                  <Select
-                    value={activeFilters[String(filter.key)] ?? "All"}
-                    onChange={(event) => {
-                      startTransition(() => {
-                        setActiveFilters((current) => ({
-                          ...current,
-                          [String(filter.key)]: event.target.value,
-                        }));
-                      });
-                    }}
-                    className="h-12 min-w-0 rounded-2xl border-border bg-background"
-                  >
-                    <option value="All">All {filter.label}</option>
-                    {filter.options.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
+          {availableFilters.map((filter) => (
+            <Select
+              key={String(filter.key)}
+              value={activeFilters[String(filter.key)] ?? "All"}
+              onChange={(event) => {
+                startTransition(() => {
+                  setActiveFilters((current) => ({
+                    ...current,
+                    [String(filter.key)]: event.target.value,
+                  }));
+                });
+              }}
+              className="h-10 w-full lg:w-[140px] shrink-0 rounded-xl border-border bg-background text-sm"
+            >
+              <option value="All">All {filter.label}</option>
+              {filter.options.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
               ))}
+            </Select>
+          ))}
 
-              {dateKey ? (
-                <div className="min-w-[280px] flex-1 sm:flex-none sm:basis-[320px]">
-                  <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    <CalendarRange className="size-3.5" />
-                    {dateColumnLabel} Range
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="relative">
-                      <CalendarRange className="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        type="date"
-                        aria-label={`${dateColumnLabel} from`}
-                        value={dateFrom}
-                        onChange={(event) => setDateFrom(event.target.value)}
-                        className="h-12 rounded-2xl border-border bg-background pl-10"
-                      />
-                    </div>
-                    <div className="relative">
-                      <CalendarRange className="pointer-events-none absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        type="date"
-                        aria-label={`${dateColumnLabel} to`}
-                        value={dateTo}
-                        onChange={(event) => setDateTo(event.target.value)}
-                        className="h-12 rounded-2xl border-border bg-background pl-10"
-                      />
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-
-              <div className="min-w-[220px] flex-1 sm:flex-none sm:basis-[240px]">
-                <label className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  Sort
-                </label>
-                <div className="flex gap-2">
-                  <Select
-                    value={String(sortKey)}
-                    onChange={(event) => setSortKey(event.target.value as keyof T | "")}
-                    className="h-12 min-w-0 rounded-2xl border-border bg-background"
-                  >
-                    <option value="">Sort by</option>
-                    {columns
-                      .filter((column) => column.key)
-                      .map((column) => (
-                        <option key={column.id ?? String(column.key)} value={String(column.key)}>
-                          {column.header}
-                        </option>
-                      ))}
-                  </Select>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-12 rounded-2xl px-4"
-                    onClick={() =>
-                      setSortDirection((current) => (current === "asc" ? "desc" : "asc"))
-                    }
-                    aria-label={`Sort ${sortDirection === "asc" ? "ascending" : "descending"}`}
-                  >
-                    <ArrowUpDown className="size-4" />
-                  </Button>
-                </div>
-              </div>
+          {dateKey ? (
+            <div className="flex shrink-0 items-center gap-2">
+              <Input
+                type="date"
+                aria-label={`${dateColumnLabel} from`}
+                value={dateFrom}
+                onChange={(event) => setDateFrom(event.target.value)}
+                className="h-10 flex-1 lg:w-[130px] rounded-xl border-border bg-background text-sm"
+              />
+              <span className="text-muted-foreground text-sm">-</span>
+              <Input
+                type="date"
+                aria-label={`${dateColumnLabel} to`}
+                value={dateTo}
+                onChange={(event) => setDateTo(event.target.value)}
+                className="h-10 flex-1 lg:w-[130px] rounded-xl border-border bg-background text-sm"
+              />
             </div>
+          ) : null}
 
-            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border/70 pt-3">
-              {hasActiveState ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="h-10 rounded-2xl px-4 text-xs font-semibold uppercase tracking-[0.16em]"
-                  onClick={resetControls}
-                >
-                  <RotateCcw className="size-4" />
-                  Reset
-                </Button>
-              ) : null}
-              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                Direction: {sortDirection === "asc" ? "Ascending" : "Descending"}
-              </span>
-            </div>
+          <div className="flex items-center gap-2">
+            <Select
+              value={String(sortKey)}
+              onChange={(event) => setSortKey(event.target.value as keyof T | "")}
+              className="h-10 flex-1 lg:w-[140px] shrink-0 rounded-xl border-border bg-background text-sm"
+            >
+              <option value="">Sort by</option>
+              {columns
+                .filter((column) => column.key)
+                .map((column, index) => (
+                  <option key={column.id ?? (column.key ? String(column.key) : `col-${index}`)} value={String(column.key)}>
+                    {column.header}
+                  </option>
+                ))}
+            </Select>
+
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 shrink-0 rounded-xl px-3"
+              onClick={() =>
+                setSortDirection((current) => (current === "asc" ? "desc" : "asc"))
+              }
+              aria-label={`Sort ${sortDirection === "asc" ? "ascending" : "descending"}`}
+            >
+              <ArrowUpDown className="size-4" />
+            </Button>
+
+            {hasActiveState ? (
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-10 px-3 text-xs font-semibold uppercase tracking-[0.16em]"
+                onClick={resetControls}
+              >
+                <RotateCcw className="size-4" />
+              </Button>
+            ) : null}
           </div>
         </div>
       </div>

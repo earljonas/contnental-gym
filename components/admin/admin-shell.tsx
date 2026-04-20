@@ -1,6 +1,6 @@
 "use client";
 
-import { Moon, Sun } from "lucide-react";
+import { Menu, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { AdminSidebar } from "@/components/admin/sidebar";
@@ -76,6 +76,16 @@ export function AdminShell({
       >
         <header className="sticky top-0 z-20 border-b border-border bg-background/88 backdrop-blur-xl">
           <div className="flex items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+            <Button
+              id="mobile-menu-trigger"
+              variant="outline"
+              size="icon"
+              className="lg:hidden size-10 shrink-0 rounded-2xl"
+              aria-label="Navigation menu"
+              onClick={() => setIsSidebarOpen((current) => !current)}
+            >
+              <Menu className="size-4" />
+            </Button>
             <div className="ml-auto flex items-center gap-2 sm:gap-3">
               <Button
                 type="button"

@@ -36,7 +36,6 @@ export function AdminSidebar({
     return pathname === href || pathname.startsWith(`${href}/`);
   }, [pathname]);
 
-  const openTriggerRef = useRef<HTMLButtonElement>(null);
   const closeTriggerRef = useRef<HTMLButtonElement>(null);
   const prevIsOpen = useRef(isOpen);
 
@@ -45,7 +44,7 @@ export function AdminSidebar({
       // Small timeout to allow transition to start/display before focusing
       setTimeout(() => closeTriggerRef.current?.focus(), 50);
     } else if (!isOpen && prevIsOpen.current) {
-      openTriggerRef.current?.focus();
+      document.getElementById("mobile-menu-trigger")?.focus();
     }
     prevIsOpen.current = isOpen;
 
@@ -85,7 +84,7 @@ export function AdminSidebar({
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                className="mt-0.5 shrink-0 rounded-xl text-[var(--sidebar-foreground)] hover:text-[var(--sidebar-foreground-active)]"
+                className="mt-0.5 shrink-0 rounded-xl text-[var(--sidebar-foreground)] hover:bg-white/[0.08] hover:text-[var(--sidebar-foreground-active)] cursor-pointer"
                 aria-label="Collapse sidebar"
                 onClick={onToggleCollapse}
               >
@@ -98,7 +97,7 @@ export function AdminSidebar({
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                className="rounded-xl text-[var(--sidebar-foreground)] hover:text-[var(--sidebar-foreground-active)]"
+                className="rounded-xl text-[var(--sidebar-foreground)] hover:bg-white/[0.08] hover:text-[var(--sidebar-foreground-active)]"
                 aria-label="Expand sidebar"
                 onClick={onToggleCollapse}
               >
@@ -167,14 +166,6 @@ export function AdminSidebar({
           </div>
         </div>
       </aside>
-
-      <div className="border-b border-border bg-background px-4 py-4 lg:hidden">
-        <div className="flex items-center">
-          <Button variant="outline" size="icon-sm" aria-label="Navigation menu" onClick={onToggleMobile} ref={openTriggerRef}>
-            <Menu className="size-4" />
-          </Button>
-        </div>
-      </div>
 
       <aside
         role="dialog"
