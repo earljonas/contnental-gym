@@ -14,8 +14,9 @@ export default async function BranchPage() {
     .eq("id", user!.id)
     .single();
 
-  const branchId = profile?.branch_id;
-  const branchName = (profile?.branches as Record<string, string> | null)?.name;
+  const rawBranches = profile?.branches;
+  const branchObj = Array.isArray(rawBranches) ? rawBranches[0] : rawBranches;
+  const branchName = (branchObj as Record<string, string> | null)?.name;
 
   // Fetch members associated with this branch (meaning their last attendance or branch assigned)
   // For now, let's fetch all users and their memberships, RLS will restrict to their branch anyway.
@@ -28,11 +29,11 @@ export default async function BranchPage() {
   const totalMembers = members?.length || 0;
   const activeMembers =
     members?.filter((m) =>
-      Array.isArray(m.memberships) && m.memberships.some((ms: Record<string, string>) => ms.status === "ACTIVE")
+      Array.isArray(m.memberships) && m.memberships.some((ms) => ms.status === "ACTIVE")
     ).length || 0;
   const pendingMembers =
     members?.filter((m) =>
-      Array.isArray(m.memberships) && m.memberships.some((ms: Record<string, string>) => ms.status === "PENDING")
+      Array.isArray(m.memberships) && m.memberships.some((ms) => ms.status === "PENDING")
     ).length || 0;
 
   return (
@@ -123,20 +124,20 @@ export default async function BranchPage() {
                     </td>
                     <td className="px-6 py-4 text-[14px] font-medium uppercase text-gold">
                       {latestMembership
-                        ? (latestMembership as Record<string, Record<string, string>>)?.membership_plans?.name
+                        ? (latestMembership as unknown as Record<string, Record<string, string>>)?.membership_plans?.name
                         : "—"}
                     </td>
                     <td className="px-6 py-4">
                       <span
                         className={`inline-block text-[11px] font-medium uppercase tracking-wider ${
-                          (latestMembership as Record<string, string>)?.status === "ACTIVE"
+                          (latestMembership as unknown as Record<string, string>)?.status === "ACTIVE"
                             ? "text-green-500"
-                            : (latestMembership as Record<string, string>)?.status === "PENDING"
+                            : (latestMembership as unknown as Record<string, string>)?.status === "PENDING"
                               ? "text-yellow-500"
                               : "text-text-muted"
                         }`}
                       >
-                        {(latestMembership as Record<string, string>)?.status || "NONE"}
+                        {(latestMembership as unknown as Record<string, string>)?.status || "NONE"}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-[13px] text-text-secondary">
@@ -166,14 +167,14 @@ export default async function BranchPage() {
                   </span>
                   <span
                     className={`text-[10px] font-medium uppercase tracking-wider ${
-                      (latestMembership as Record<string, string>)?.status === "ACTIVE"
+                      (latestMembership as unknown as Record<string, string>)?.status === "ACTIVE"
                         ? "text-green-500"
-                        : (latestMembership as Record<string, string>)?.status === "PENDING"
+                        : (latestMembership as unknown as Record<string, string>)?.status === "PENDING"
                           ? "text-yellow-500"
                           : "text-text-muted"
                     }`}
                   >
-                    {(latestMembership as Record<string, string>)?.status || "NONE"}
+                    {(latestMembership as unknown as Record<string, string>)?.status || "NONE"}
                   </span>
                 </div>
                 <div className="mt-1 flex items-center gap-3 text-[12px] text-text-secondary">
@@ -181,7 +182,7 @@ export default async function BranchPage() {
                   <span>•</span>
                   <span className="text-gold uppercase">
                     {latestMembership
-                      ? (latestMembership as Record<string, Record<string, string>>)?.membership_plans?.name
+                      ? (latestMembership as unknown as Record<string, Record<string, string>>)?.membership_plans?.name
                       : "No plan"}
                   </span>
                 </div>

@@ -57,7 +57,7 @@ const itemVariants = {
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] },
+    transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] },
   },
 };
 
@@ -72,14 +72,9 @@ export function Membership() {
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           className="mb-16"
         >
-          <span className="label-caps text-text-secondary">PRICING</span>
           <h2 className="section-title mt-4 font-display text-white">
             MEMBERSHIP
           </h2>
-          <p className="mt-4 max-w-lg text-[15px] leading-relaxed text-text-secondary">
-            Three plans depending on how you want to train. All memberships
-            include full access to the gym floor and facilities.
-          </p>
         </motion.div>
 
         <motion.div

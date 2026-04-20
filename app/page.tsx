@@ -1,7 +1,6 @@
 import { Navbar } from "@/components/sections/Navbar";
 import { Hero } from "@/components/sections/Hero";
 import { Stats } from "@/components/sections/Stats";
-import { About } from "@/components/sections/About";
 import { Programs } from "@/components/sections/Programs";
 import { Coaches } from "@/components/sections/Coaches";
 import { Membership } from "@/components/sections/Membership";

@@ -1,6 +1,8 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+
+import { AdminShell } from "@/components/admin/admin-shell";
 import { createClient } from "@/lib/supabase/server";
-import Link from "next/link";
 import { getUserRole } from "@/lib/supabase/roles";
 
 export default async function AdminLayout({
@@ -23,47 +25,23 @@ export default async function AdminLayout({
 
   const roleInfo = await getUserRole(supabase, user.id);
 
-  // Only super admins can access
   if (roleInfo.role === "BRANCH_ADMIN") redirect("/branch");
   if (roleInfo.role !== "SUPER_ADMIN") redirect("/dashboard");
 
+  const cookieStore = await cookies();
+  const initialTheme = cookieStore.get("continental-admin-theme")?.value === "dark" ? "dark" : "light";
+  const initialSidebarCollapsed =
+    cookieStore.get("continental-admin-sidebar-collapsed")?.value === "true";
+  const userName = `${profile?.first_name ?? "Super"} ${profile?.last_name ?? "Admin"}`.trim();
+
   return (
-    <div className="flex min-h-screen flex-col bg-page-bg">
-      {/* Top nav */}
-      <header className="border-b border-border-subtle bg-surface">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-4">
-            <Link href="/" className="flex flex-col leading-none">
-              <span className="font-display text-lg font-black uppercase tracking-tight text-white">
-                CONTNENTAL
-              </span>
-              <span className="text-[9px] font-medium uppercase tracking-[0.2em] text-text-secondary">
-                FITNESS GYM
-              </span>
-            </Link>
-            <span className="ml-2 border border-gold bg-gold/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-gold">
-              SUPER ADMIN
-            </span>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <span className="text-[13px] text-text-secondary">
-              {profile?.first_name} {profile?.last_name}
-            </span>
-            <form action="/auth/signout" method="post">
-              <button
-                type="submit"
-                className="text-[11px] uppercase tracking-[0.15em] text-text-secondary transition-colors hover:text-white"
-              >
-                Sign out
-              </button>
-            </form>
-          </div>
-        </div>
-      </header>
-
-      {/* Content */}
-      <main className="flex-1">{children}</main>
-    </div>
+    <AdminShell
+      userName={userName}
+      role={roleInfo.role}
+      initialTheme={initialTheme}
+      initialSidebarCollapsed={initialSidebarCollapsed}
+    >
+      {children}
+    </AdminShell>
   );
 }

@@ -9,7 +9,6 @@ type RoleLookupResult = {
   data: RoleRecord | null;
   error: { code?: string; message?: string } | null;
 };
-
 async function readRole(
   supabase: any,
   table: "user_roles" | "profiles",
