@@ -27,6 +27,7 @@ export function ResourcePage<T extends Record<string, string>>({
   searchKeys,
   filters,
   dateKey,
+  charts,
 }: {
   title: string;
   actionLabel?: string;
@@ -42,6 +43,7 @@ export function ResourcePage<T extends Record<string, string>>({
     options: string[];
   }[];
   dateKey?: keyof T;
+  charts?: React.ReactNode;
 }) {
   return (
     <AdminPageTransition>
@@ -62,6 +64,8 @@ export function ResourcePage<T extends Record<string, string>>({
             </Card>
           ))}
         </div>
+
+        {charts ? <div className="grid gap-6">{charts}</div> : null}
 
         <Card className="rounded-[30px]">
           <CardHeader className="flex-col gap-4 border-b border-border/70 p-6 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">

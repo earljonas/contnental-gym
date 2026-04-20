@@ -1,4 +1,6 @@
 import { ResourcePage } from "@/components/admin/resource-page";
+import { BranchTrafficStack, PeakHoursChart } from "@/components/admin/data-charts";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSuperAdminOverview } from "@/lib/super-admin/data";
 
 export default async function AttendancePage() {
@@ -27,6 +29,26 @@ export default async function AttendancePage() {
         { key: "branch", label: "Branch", options: [...new Set(overview.attendance.map((item) => item.branch))] },
       ]}
       dateKey="date"
+      charts={
+        <div className="grid gap-6 xl:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Peak Hours Curve</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <PeakHoursChart />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Branch Traffic Comparison</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <BranchTrafficStack />
+            </CardContent>
+          </Card>
+        </div>
+      }
     />
   );
 }

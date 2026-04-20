@@ -3,6 +3,7 @@ import { ArrowDownRight, ArrowRight, ArrowUpRight, BellDot, Sparkles } from "luc
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { AdminPageTransition } from "@/components/admin/page-transition";
 import { DistributionBarChart, TrendLineChart } from "@/components/admin/charts";
+import { AttendanceHeatmap } from "@/components/admin/data-charts";
 import { ResourceTable } from "@/components/admin/resource-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -103,6 +104,16 @@ export function DashboardPage({
             </CardContent>
           </Card>
         </div>
+
+        <Card>
+          <CardHeader className="flex-row items-center justify-between space-y-0">
+            <CardTitle>Peak Attendance Heatmap</CardTitle>
+            <Badge variant="outline">Branch Usage</Badge>
+          </CardHeader>
+          <CardContent className="pt-2">
+            <AttendanceHeatmap />
+          </CardContent>
+        </Card>
 
         <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
           <Card>
