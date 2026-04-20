@@ -40,6 +40,12 @@
   --radius-3xl: 0px;
   --radius-4xl: 0px;
   
+  --color-chart-primary: var(--chart-primary); 
+  --color-chart-secondary: var(--chart-secondary);
+  --color-chart-success: var(--chart-success);
+  --color-chart-risk: var(--chart-risk); 
+  --color-chart-tertiary: var(--chart-tertiary);
+  
   --color-chart-blue: var(--chart-blue);
   --color-chart-amber: var(--chart-amber);
   --color-chart-emerald: var(--chart-emerald);
@@ -80,6 +86,12 @@
   --sidebar-hover: rgba(255, 255, 255, 0.06);
   --radius: 0px;
   
+  --chart-primary: #C9973E;
+  --chart-secondary: #3B82F6;
+  --chart-success: #10B981;
+  --chart-risk: #F43F5E;
+  --chart-tertiary: #8B5CF6;
+  
   --chart-blue: var(--color-blue-500);
   --chart-amber: var(--color-amber-500);
   --chart-emerald: var(--color-emerald-500);
@@ -118,6 +130,12 @@
   --sidebar-foreground-active: #F0EDE8;
   --sidebar-accent: #C9973E;
   --sidebar-hover: rgba(255, 255, 255, 0.06);
+
+  --chart-primary: #B48430;
+  --chart-secondary: #2563EB;
+  --chart-success: #059669;
+  --chart-risk: #E11D48;
+  --chart-tertiary: #7C3AED;
 }
 
 /* Noise texture SVG filter */
