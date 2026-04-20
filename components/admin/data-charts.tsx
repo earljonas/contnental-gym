@@ -19,11 +19,11 @@ import { cn } from "@/lib/utils";
 
 // --- MOCK DATA ---
 const STYLES = {
-  blue: { fill: "#3b82f6", stroke: "#2563eb" },
-  amber: { fill: "#fbbf24", stroke: "#d97706" },
-  emerald: { fill: "#10b981", stroke: "#059669" },
-  rose: { fill: "#f43f5e", stroke: "#e11d48" },
-  slate: { fill: "#64748b", stroke: "#475569" },
+  blue: { fill: "var(--chart-blue)", stroke: "var(--chart-blue)" },
+  amber: { fill: "var(--chart-amber)", stroke: "var(--chart-amber)" },
+  emerald: { fill: "var(--chart-emerald)", stroke: "var(--chart-emerald)" },
+  rose: { fill: "var(--chart-rose)", stroke: "var(--chart-rose)" },
+  slate: { fill: "var(--chart-slate)", stroke: "var(--chart-slate)" },
 };
 
 export const MOCK_CHART_DATA = {
@@ -235,9 +235,10 @@ export function BranchTrafficStack() {
 
 export function RevenueOutstandingChart() {
   return (
-    <div className="h-[120px] w-full mt-4">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={MOCK_CHART_DATA.revenueOutstanding} layout="vertical">
+    <div className="h-[180px] w-full mt-4 flex flex-col justify-between">
+      <div className="flex-1 min-h-[80px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={MOCK_CHART_DATA.revenueOutstanding} layout="vertical">
           <CartesianGrid horizontal={false} vertical={false} />
           <XAxis type="number" hide />
           <YAxis dataKey="category" type="category" hide />
@@ -247,9 +248,10 @@ export function RevenueOutstandingChart() {
               <Cell key={`cell-${index}`} fill={entry.color} />
             ))}
           </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-      <div className="flex gap-6 justify-center mt-6">
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="flex flex-wrap gap-x-6 gap-y-3 justify-center mt-6 pb-2">
         {MOCK_CHART_DATA.revenueOutstanding.map((entry) => (
           <div key={entry.category} className="flex items-center gap-2">
             <div className="size-3 rounded-full" style={{ backgroundColor: entry.color }} />

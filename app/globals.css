@@ -39,6 +39,12 @@
   --radius-2xl: 0px;
   --radius-3xl: 0px;
   --radius-4xl: 0px;
+  
+  --color-chart-blue: var(--chart-blue);
+  --color-chart-amber: var(--chart-amber);
+  --color-chart-emerald: var(--chart-emerald);
+  --color-chart-rose: var(--chart-rose);
+  --color-chart-slate: var(--chart-slate);
 }
 
 :root {
@@ -73,6 +79,12 @@
   --sidebar-accent: #C9973E;
   --sidebar-hover: rgba(255, 255, 255, 0.06);
   --radius: 0px;
+  
+  --chart-blue: var(--color-blue-500);
+  --chart-amber: var(--color-amber-500);
+  --chart-emerald: var(--color-emerald-500);
+  --chart-rose: var(--color-rose-500);
+  --chart-slate: var(--color-slate-500);
 }
 
 .light {
