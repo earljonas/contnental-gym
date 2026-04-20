@@ -102,9 +102,9 @@ type OverviewData = {
 const fallbackData: OverviewData = {
   metrics: [
     { label: "Active members", value: "1,248", delta: "+8.2%", trend: "up" },
-    { label: "Monthly revenue", value: "PHP 486K", delta: "+12.4%", trend: "up" },
-    { label: "Daily check-ins", value: "312", delta: "+4.1%", trend: "up" },
-    { label: "Overdue accounts", value: "27", delta: "-6.5%", trend: "down" },
+    { label: "Total MRR", value: "PHP 486K", delta: "+12.4%", trend: "up" },
+    { label: "Churn rate (30d)", value: "2.4%", delta: "-0.5%", trend: "up" },
+    { label: "Branch utilisation", value: "68%", delta: "+4.1%", trend: "up" },
   ],
   revenueTrend: [
     { label: "Jan", value: 320000 },

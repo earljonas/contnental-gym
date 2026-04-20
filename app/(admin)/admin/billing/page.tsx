@@ -1,4 +1,6 @@
 import { ResourcePage } from "@/components/admin/resource-page";
+import { RevenueOutstandingChart } from "@/components/admin/data-charts";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSuperAdminOverview } from "@/lib/super-admin/data";
 
 export default async function BillingPage() {
@@ -32,6 +34,18 @@ export default async function BillingPage() {
         { key: "method", label: "Method", options: [...new Set(overview.payments.map((item) => item.method).filter(Boolean))] },
       ]}
       dateKey="dueDate"
+      charts={
+        <div className="grid xl:grid-cols-[1.5fr_1fr]">
+          <Card>
+            <CardHeader>
+              <CardTitle>Cash Flow Receivables</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <RevenueOutstandingChart />
+            </CardContent>
+          </Card>
+        </div>
+      }
     />
   );
 }
