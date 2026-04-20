@@ -73,7 +73,7 @@ export const MOCK_CHART_DATA = {
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="rounded-xl border border-white/10 bg-background/95 p-3 shadow-xl backdrop-blur-md">
+      <div className="rounded-xl border border-border bg-card p-3 shadow-xl backdrop-blur-md">
         <p className="mb-2 text-xs font-semibold text-muted-foreground uppercase">{label}</p>
         <div className="space-y-1">
           {payload.map((entry: any, index: number) => (
@@ -131,7 +131,7 @@ export function AttendanceHeatmap() {
                       className="h-12 w-full rounded-lg transition-colors hover:brightness-110 flex items-center justify-center cursor-default group"
                       style={{ backgroundColor: getHeatColor(val) }}
                     >
-                      <span className="text-white/0 group-hover:text-white font-bold text-xs transition-colors drop-shadow-md">
+                      <span className="opacity-0 group-hover:opacity-100 font-bold text-xs transition-opacity [text-shadow:_0_1px_2px_rgb(0_0_0_/_40%)] text-white">
                         {val}%
                       </span>
                     </div>
@@ -183,10 +183,10 @@ export function MemberLifespanChart() {
               <stop offset="95%" stopColor={STYLES.slate.fill} stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
-          <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "#888" }} dy={10} />
-          <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "#888" }} dx={-10} />
-          <Tooltip content={<CustomTooltip />} />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+          <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} dy={10} />
+          <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} dx={-10} />
+          <Tooltip content={<CustomTooltip />} cursor={{ stroke: "var(--border)", strokeWidth: 1, strokeDasharray: "3 3" }} />
           <Area type="monotone" dataKey="members" stroke={STYLES.slate.fill} fillOpacity={1} fill="url(#colorMembers)" strokeWidth={3} />
         </AreaChart>
       </ResponsiveContainer>
@@ -205,9 +205,9 @@ export function PeakHoursChart() {
               <stop offset="95%" stopColor={STYLES.amber.fill} stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
-          <XAxis dataKey="hour" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "#888" }} dy={10} />
-          <Tooltip content={<CustomTooltip />} />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+          <XAxis dataKey="hour" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} dy={10} />
+          <Tooltip content={<CustomTooltip />} cursor={{ stroke: "var(--border)", strokeWidth: 1, strokeDasharray: "3 3" }} />
           <Area type="natural" dataKey="traffic" stroke={STYLES.amber.fill} fillOpacity={1} fill="url(#colorPeak)" strokeWidth={3} />
         </AreaChart>
       </ResponsiveContainer>
@@ -220,10 +220,10 @@ export function BranchTrafficStack() {
     <div className="h-[280px] w-full">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={MOCK_CHART_DATA.branchTraffic}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
-          <XAxis dataKey="day" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "#888" }} dy={10} />
-          <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "#888" }} dx={-10} />
-          <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(255,255,255,0.05)" }} />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+          <XAxis dataKey="day" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} dy={10} />
+          <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} dx={-10} />
+          <Tooltip content={<CustomTooltip />} cursor={{ fill: "var(--border)" }} />
           <Bar dataKey="Torres" stackId="a" fill={STYLES.rose.fill} radius={[0, 0, 4, 4]} />
           <Bar dataKey="Lanang" stackId="a" fill={STYLES.amber.fill} />
           <Bar dataKey="Ecoland" stackId="a" fill={STYLES.blue.fill} radius={[4, 4, 0, 0]} />
