@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { PanelLeftClose, PanelLeftOpen, UserRound, X } from "lucide-react";
+import { Menu, PanelLeftClose, PanelLeftOpen, UserRound, X } from "lucide-react";
 import { motion } from "framer-motion";
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 
 import { getAdminNav } from "@/components/admin/navigation";
 import { Button } from "@/components/ui/button";
@@ -36,7 +36,19 @@ export function AdminSidebar({
     return pathname === href || pathname.startsWith(`${href}/`);
   }, [pathname]);
 
+  const openTriggerRef = useRef<HTMLButtonElement>(null);
+  const closeTriggerRef = useRef<HTMLButtonElement>(null);
+  const prevIsOpen = useRef(isOpen);
+
   useEffect(() => {
+    if (isOpen && !prevIsOpen.current) {
+      // Small timeout to allow transition to start/display before focusing
+      setTimeout(() => closeTriggerRef.current?.focus(), 50);
+    } else if (!isOpen && prevIsOpen.current) {
+      openTriggerRef.current?.focus();
+    }
+    prevIsOpen.current = isOpen;
+
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onCloseMobile();
@@ -59,24 +71,16 @@ export function AdminSidebar({
             isCollapsed ? "px-4 py-6" : "px-6 py-6"
           )}
         >
-          <div className={cn("flex items-start", isCollapsed ? "justify-center" : "justify-between gap-3")}>
-            <Link
-              href="/admin"
-              className={cn("flex flex-col leading-none", isCollapsed && "items-center text-center")}
-            >
-              <span className="font-display text-[24px] font-black uppercase tracking-tight text-[var(--sidebar-foreground-active)]">
-                CONTNENTAL
-              </span>
-              <span
-                className={cn(
-                  "text-[10px] font-medium uppercase tracking-[0.2em] text-[var(--sidebar-foreground)]",
-                  isCollapsed && "mt-2 max-w-[64px] leading-tight"
-                )}
-              >
-                FITNESS GYM
-              </span>
-            </Link>
-            {!isCollapsed ? (
+          {!isCollapsed ? (
+            <div className="flex items-start justify-between gap-3">
+              <Link href="/admin" className="flex flex-col leading-none">
+                <span className="font-display text-[24px] font-black uppercase tracking-tight text-[var(--sidebar-foreground-active)]">
+                  CONTNENTAL
+                </span>
+                <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-[var(--sidebar-foreground)]">
+                  FITNESS GYM
+                </span>
+              </Link>
               <Button
                 type="button"
                 variant="ghost"
@@ -87,10 +91,9 @@ export function AdminSidebar({
               >
                 <PanelLeftClose className="size-4" />
               </Button>
-            ) : null}
-          </div>
-          {isCollapsed ? (
-            <div className="mt-5 flex justify-center">
+            </div>
+          ) : (
+            <div className="flex justify-center">
               <Button
                 type="button"
                 variant="ghost"
@@ -102,7 +105,7 @@ export function AdminSidebar({
                 <PanelLeftOpen className="size-4" />
               </Button>
             </div>
-          ) : null}
+          )}
         </div>
 
         <nav className={cn("flex-1 space-y-2 overflow-y-auto py-6", isCollapsed ? "px-3" : "px-4")}>
@@ -166,25 +169,19 @@ export function AdminSidebar({
       </aside>
 
       <div className="border-b border-border bg-background px-4 py-4 lg:hidden">
-        <div className="flex items-center justify-between gap-4">
-          <Link href="/admin" className="flex flex-col leading-none">
-            <span className="font-display text-[22px] font-black uppercase tracking-tight text-foreground">
-              CONTNENTAL
-            </span>
-            <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
-              FITNESS GYM
-            </span>
-          </Link>
-          <Button variant="outline" size="icon-sm" aria-label="Navigation" onClick={onToggleMobile}>
-            <PanelLeftOpen className="size-4" />
+        <div className="flex items-center">
+          <Button variant="outline" size="icon-sm" aria-label="Navigation menu" onClick={onToggleMobile} ref={openTriggerRef}>
+            <Menu className="size-4" />
           </Button>
         </div>
       </div>
 
       <aside
         role="dialog"
-        aria-modal="true"
+        aria-modal={isOpen ? "true" : "false"}
         aria-label="Navigation menu"
+        aria-hidden={!isOpen}
+        inert={!isOpen ? true : undefined}
         className={cn(
           "fixed inset-y-0 left-0 z-30 w-[88vw] max-w-sm border-r border-white/10 bg-[var(--sidebar)] p-4 shadow-2xl transition-transform duration-300 ease-out lg:hidden",
           isOpen ? "translate-x-0" : "-translate-x-full"
@@ -199,7 +196,7 @@ export function AdminSidebar({
               FITNESS GYM
             </span>
           </Link>
-          <Button variant="ghost" size="icon-sm" aria-label="Close navigation" onClick={onCloseMobile}>
+          <Button variant="ghost" size="icon-sm" aria-label="Close navigation" onClick={onCloseMobile} ref={closeTriggerRef}>
             <X className="size-4 text-[var(--sidebar-foreground-active)]" />
           </Button>
         </div>

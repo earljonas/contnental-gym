@@ -90,7 +90,6 @@ export function Gallery() {
           viewport={{ once: true, margin: "-80px" }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
         >
-          <span className="label-caps text-text-secondary">THE SPACE</span>
           <h2 className="section-title mt-3 font-display text-white">
             INSIDE THE GYM
           </h2>

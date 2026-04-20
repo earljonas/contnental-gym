@@ -97,7 +97,6 @@ export function Programs() {
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           className="mb-16"
         >
-          <span className="label-caps text-text-secondary">WHAT WE OFFER</span>
           <h2 className="section-title mt-4 font-display text-white">
             PROGRAMS
           </h2>

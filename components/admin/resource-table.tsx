@@ -37,7 +37,7 @@ function normalizeToYMD(value: string): string | null {
   const ms = Date.parse(value);
   if (Number.isNaN(ms)) return null;
   const d = new Date(ms);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
 }
 
 function statusBadgeClass(value: string) {
@@ -284,8 +284,10 @@ export function ResourceTable<T extends Record<string, string>>({
       <Table className="min-w-[720px]">
         <TableHeader>
           <TableRow className="hover:bg-transparent">
-            {columns.map((column) => (
-              <TableHead key={column.id ?? String(column.key)}>{column.header}</TableHead>
+            {columns.map((column, index) => (
+              <TableHead key={column.id ?? (column.key ? String(column.key) : `col-${index}`)}>
+                {column.header}
+              </TableHead>
             ))}
           </TableRow>
         </TableHeader>
@@ -302,7 +304,7 @@ export function ResourceTable<T extends Record<string, string>>({
           ) : (
             filteredRows.map((row, rowIndex) => (
               <TableRow key={rowIndex}>
-                {columns.map((column) => {
+                {columns.map((column, columnIndex) => {
                   const value = column.key ? row[column.key] : "";
                   const isStatus =
                     column.cellType === "status" ||
@@ -311,7 +313,7 @@ export function ResourceTable<T extends Record<string, string>>({
                   const isEmailAction = column.cellType === "email-action";
 
                   return (
-                    <TableCell key={column.id ?? String(column.key)} className="text-[15px]">
+                    <TableCell key={column.id ?? (column.key ? String(column.key) : `col-${columnIndex}`)} className="text-[15px]">
                       {isEmailAction ? (
                         <Button asChild variant="outline" className="h-9 rounded-full px-3.5 text-[11px] font-semibold uppercase tracking-[0.16em]">
                           <a href={`mailto:${value}`}>Email</a>
