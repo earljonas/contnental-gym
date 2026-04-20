@@ -33,5 +33,5 @@ const adminNav: AdminNavItem[] = [
 ] as const;
 
 export function getAdminNav(role: AppRole) {
-  return adminNav.filter((item) => !("roles" in item) || item.roles.includes(role));
+  return adminNav.filter((item) => !item.roles || item.roles.includes(role));
 }

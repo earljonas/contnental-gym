@@ -9,21 +9,8 @@ type RoleLookupResult = {
   data: RoleRecord | null;
   error: { code?: string; message?: string } | null;
 };
-
-type RoleQueryBuilder = {
-  select: (columns: string) => {
-    eq: (column: "user_id" | "id", value: string) => {
-      maybeSingle: () => PromiseLike<RoleLookupResult>;
-    };
-  };
-};
-
-type SupabaseRoleClient = {
-  from: (table: "user_roles" | "profiles") => RoleQueryBuilder;
-};
-
 async function readRole(
-  supabase: SupabaseRoleClient,
+  supabase: any,
   table: "user_roles" | "profiles",
   idColumn: "user_id" | "id",
   userId: string
@@ -42,7 +29,7 @@ async function readRole(
 }
 
 export async function getUserRole(
-  supabase: SupabaseRoleClient,
+  supabase: any,
   userId: string
 ): Promise<RoleRecord> {
   const userRolesResult = await readRole(supabase, "user_roles", "user_id", userId);
