@@ -44,7 +44,7 @@ export function AppPreview() {
                   >
                     <path
                       d="M3 8L6.5 11.5L13 5"
-                      stroke="#C6A75E"
+                      stroke="#C9973E"
                       strokeWidth="1.5"
                       strokeLinecap="round"
                       strokeLinejoin="round"

@@ -201,32 +201,6 @@ export function ResourceTable<T extends Record<string, string>>({
           ) : null}
 
           <div className="flex items-center gap-2">
-            <Select
-              value={String(sortKey)}
-              onChange={(event) => setSortKey(event.target.value as keyof T | "")}
-              className="h-10 flex-1 lg:w-[140px] shrink-0 rounded-xl border-border bg-background text-sm"
-            >
-              <option value="">Sort by</option>
-              {columns
-                .filter((column) => column.key)
-                .map((column, index) => (
-                  <option key={column.id ?? (column.key ? String(column.key) : `col-${index}`)} value={String(column.key)}>
-                    {column.header}
-                  </option>
-                ))}
-            </Select>
-
-            <Button
-              type="button"
-              variant="outline"
-              className="h-10 shrink-0 rounded-xl px-3"
-              onClick={() =>
-                setSortDirection((current) => (current === "asc" ? "desc" : "asc"))
-              }
-              aria-label={`Sort ${sortDirection === "asc" ? "ascending" : "descending"}`}
-            >
-              <ArrowUpDown className="size-4" />
-            </Button>
 
             {hasActiveState ? (
               <Button

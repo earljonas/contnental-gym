@@ -19,7 +19,7 @@ export default async function AnnouncementsPage() {
       <div className="space-y-8">
         <AdminPageHeader title="Announcements" />
 
-        <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+        <div className="grid gap-6 lg:grid-cols-[1fr_1.7fr]">
           <Card>
             <CardHeader>
               <CardTitle>Compose</CardTitle>

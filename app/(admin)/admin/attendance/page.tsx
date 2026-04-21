@@ -11,9 +11,9 @@ export default async function AttendancePage() {
       title="Attendance"
       summary={[
         { label: "Recent logs", value: overview.attendance.length.toString() },
-        { label: "View mode", value: "Read only" },
-        { label: "Branches visible", value: "All" },
-        { label: "Alerts", value: "0 blocked" },
+        { label: "Branches active", value: [...new Set(overview.attendance.map((item) => item.branch))].length.toString() },
+        { label: "Ecoland check-ins", value: overview.attendance.filter((item) => item.branch.toLowerCase().includes("ecoland")).length.toString() },
+        { label: "Torres check-ins", value: overview.attendance.filter((item) => item.branch.toLowerCase().includes("torres")).length.toString() },
       ]}
       tableTitle="Feed"
       columns={[

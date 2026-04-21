@@ -35,7 +35,7 @@ export default async function BillingPage() {
       ]}
       dateKey="dueDate"
       charts={
-        <div className="grid xl:grid-cols-[1.5fr_1fr]">
+        <div className="grid grid-cols-1 max-w-2xl">
           <Card>
             <CardHeader>
               <CardTitle>Cash Flow Receivables</CardTitle>
