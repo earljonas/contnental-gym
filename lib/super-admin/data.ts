@@ -60,13 +60,7 @@ export type AttendanceRow = {
   date: string;
 };
 
-export type StaffRow = {
-  name: string;
-  role: "Owner" | "Manager" | "Receptionist";
-  branch: string;
-  permissions: string;
-  status: "Active" | "Invited";
-};
+
 
 export type RetentionRow = {
   member: string;
@@ -94,7 +88,6 @@ type OverviewData = {
   plans: PlanRow[];
   payments: PaymentRow[];
   attendance: AttendanceRow[];
-  staff: StaffRow[];
   retention: RetentionRow[];
   announcements: AnnouncementRow[];
 };
@@ -251,29 +244,6 @@ const fallbackData: OverviewData = {
     { member: "Noah Reyes", branch: "Ecoland", time: "7:02 AM", date: "Apr 17, 2026" },
     { member: "Alyssa Tan", branch: "Torres", time: "8:16 AM", date: "Apr 17, 2026" },
     { member: "Jerome Cruz", branch: "Lanang", time: "5:48 PM", date: "Apr 16, 2026" },
-  ],
-  staff: [
-    {
-      name: "Sophie dela Cruz",
-      role: "Owner",
-      branch: "All branches",
-      permissions: "All modules",
-      status: "Active",
-    },
-    {
-      name: "Marco Villar",
-      role: "Manager",
-      branch: "Lanang",
-      permissions: "Billing, members, announcements",
-      status: "Active",
-    },
-    {
-      name: "Jessa Lim",
-      role: "Receptionist",
-      branch: "Torres",
-      permissions: "Check-ins, member support",
-      status: "Invited",
-    },
   ],
   retention: [
     {
@@ -541,7 +511,6 @@ export async function getSuperAdminOverview(): Promise<OverviewData> {
           : fallbackData.plans,
       payments: livePayments.length ? livePayments : fallbackData.payments,
       attendance: liveAttendance.length ? liveAttendance : fallbackData.attendance,
-      staff: fallbackData.staff,
       retention: fallbackData.retention,
       announcements: fallbackData.announcements,
     };

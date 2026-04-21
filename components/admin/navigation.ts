@@ -5,7 +5,6 @@ import {
   CreditCard,
   LayoutDashboard,
   LineChart,
-  ShieldCheck,
   Users,
   WalletCards,
 } from "lucide-react";
@@ -26,7 +25,6 @@ const adminNav: AdminNavItem[] = [
   { href: "/admin/plans", label: "Plans", icon: WalletCards },
   { href: "/admin/billing", label: "Billing", icon: CreditCard },
   { href: "/admin/attendance", label: "Attendance", icon: Activity },
-  { href: "/admin/staff", label: "Staff & Roles", icon: ShieldCheck },
   { href: "/super-admin/branches", label: "Branches", icon: Building2, roles: ["SUPER_ADMIN"] },
   { href: "/admin/retention", label: "Retention", icon: LineChart },
   { href: "/admin/announcements", label: "Announcements", icon: BellRing },
