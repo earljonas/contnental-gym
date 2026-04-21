@@ -27,6 +27,7 @@ export type ActivityRow = {
 };
 
 export type MemberRow = {
+  id: string;
   name: string;
   email: string;
   branch: string;
@@ -45,6 +46,7 @@ export type PlanRow = {
 };
 
 export type PaymentRow = {
+  id: number;
   member: string;
   branch: string;
   amount: string;
@@ -155,6 +157,7 @@ const fallbackData: OverviewData = {
   ],
   members: [
     {
+      id: "a-123",
       name: "Mikaela Santos",
       email: "mikaela@contnental.fit",
       branch: "Ecoland",
@@ -163,6 +166,7 @@ const fallbackData: OverviewData = {
       joined: "Apr 12, 2026",
     },
     {
+      id: "b-234",
       name: "Jerome Cruz",
       email: "jerome@contnental.fit",
       branch: "Lanang",
@@ -171,6 +175,7 @@ const fallbackData: OverviewData = {
       joined: "Apr 10, 2026",
     },
     {
+      id: "c-456",
       name: "Alyssa Tan",
       email: "alyssa@contnental.fit",
       branch: "Torres",
@@ -215,6 +220,7 @@ const fallbackData: OverviewData = {
   ],
   payments: [
     {
+      id: 1,
       member: "Jerome Cruz",
       branch: "Lanang",
       amount: "PHP 2,500",
@@ -223,6 +229,7 @@ const fallbackData: OverviewData = {
       status: "Pending",
     },
     {
+      id: 2,
       member: "Mikaela Santos",
       branch: "Ecoland",
       amount: "PHP 4,000",
@@ -231,6 +238,7 @@ const fallbackData: OverviewData = {
       status: "Confirmed",
     },
     {
+      id: 3,
       member: "Rica Flores",
       branch: "Torres",
       amount: "PHP 1,500",
@@ -395,6 +403,7 @@ export async function getSuperAdminOverview(): Promise<OverviewData> {
       const relatedBranch = Array.isArray(member.branches) ? member.branches[0] : member.branches;
 
       return {
+        id: member.id,
         name: `${member.first_name} ${member.last_name}`.trim(),
         email: member.email,
         branch: relatedBranch?.name ?? branchNameById.get(member.branch_id ?? -1) ?? "Unassigned",
@@ -444,6 +453,7 @@ export async function getSuperAdminOverview(): Promise<OverviewData> {
     const livePayments: PaymentRow[] = payments.slice(0, 6).map((payment) => {
       const member = profileById.get(payment.user_id);
       return {
+        id: payment.id,
         member: member ? `${member.first_name} ${member.last_name}` : "Member",
         branch: branchNameById.get(member?.branch_id ?? -1) ?? "Unknown Branch",
         amount: formatCurrency(Number(payment.amount ?? 0)),

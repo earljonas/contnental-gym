@@ -2,6 +2,7 @@ import { ResourcePage } from "@/components/admin/resource-page";
 import { RevenueOutstandingChart } from "@/components/admin/data-charts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSuperAdminOverview } from "@/lib/super-admin/data";
+import { confirmPayment } from "./actions";
 
 export default async function BillingPage() {
   const overview = await getSuperAdminOverview();
@@ -23,9 +24,14 @@ export default async function BillingPage() {
         { header: "Amount", key: "amount" },
         { header: "Method", key: "method" },
         { header: "Due date", key: "dueDate" },
-        { header: "Status", key: "status" },
+        { header: "Status", key: "status", cellType: "status" },
+        { header: "Action", cellType: "payment-action" },
       ]}
       rows={overview.payments}
+      onPaymentConfirm={async (id: number) => {
+        "use server";
+        await confirmPayment(id);
+      }}
       searchPlaceholder="Search member or amount"
       searchKeys={["member", "branch", "amount", "method"]}
       filters={[

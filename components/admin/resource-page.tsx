@@ -13,10 +13,10 @@ type Column<T> = {
   header: string;
   key?: keyof T;
   id?: string;
-  cellType?: "text" | "status" | "email-action";
+  cellType?: "text" | "status" | "email-action" | "payment-action" | "member-view";
 };
 
-export function ResourcePage<T extends Record<string, string>>({
+export function ResourcePage<T extends Record<string, any>>({
   title,
   actionLabel,
   summary,
@@ -28,6 +28,8 @@ export function ResourcePage<T extends Record<string, string>>({
   filters,
   dateKey,
   charts,
+  onPaymentConfirm,
+  onMemberView,
 }: {
   title: string;
   actionLabel?: string;
@@ -44,6 +46,8 @@ export function ResourcePage<T extends Record<string, string>>({
   }[];
   dateKey?: keyof T;
   charts?: React.ReactNode;
+  onPaymentConfirm?: (id: number) => Promise<any>;
+  onMemberView?: (id: string | number) => void;
 }) {
   return (
     <AdminPageTransition>
@@ -82,6 +86,8 @@ export function ResourcePage<T extends Record<string, string>>({
               searchKeys={searchKeys}
               filters={filters}
               dateKey={dateKey}
+              onPaymentConfirm={onPaymentConfirm}
+              onMemberView={onMemberView}
             />
           </CardContent>
         </Card>

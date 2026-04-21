@@ -162,6 +162,24 @@ export function DashboardPage({
           </Card>
         </div>
 
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Payments</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResourceTable
+              columns={[
+                { header: "Member", key: "member" },
+                { header: "Amount", key: "amount" },
+                { header: "Status", key: "status" },
+                { header: "Branch", key: "branch" },
+              ]}
+              rows={payments.slice(0, 5)}
+              searchPlaceholder="Search payments"
+              searchKeys={["member", "status", "branch"]}
+            />
+          </CardContent>
+        </Card>
       </div>
     </AdminPageTransition>
   );

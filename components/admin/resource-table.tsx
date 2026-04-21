@@ -20,7 +20,7 @@ type Column<T> = {
   header: string;
   id?: string;
   key?: keyof T;
-  cellType?: "text" | "status" | "email-action";
+  cellType?: "text" | "status" | "email-action" | "payment-action";
 };
 
 type FilterConfig<T> = {
@@ -50,7 +50,7 @@ function statusBadgeClass(value: string) {
   return "";
 }
 
-export function ResourceTable<T extends Record<string, string>>({
+export function ResourceTable<T extends Record<string, any>>({
   columns,
   rows,
   searchPlaceholder,
@@ -64,6 +64,8 @@ export function ResourceTable<T extends Record<string, string>>({
   searchKeys: (keyof T)[];
   filters?: FilterConfig<T>[];
   dateKey?: keyof T;
+  onPaymentConfirm?: (id: number) => Promise<any>;
+  onMemberView?: (id: string | number) => void;
 }) {
   const [search, setSearch] = useState("");
   const [activeFilters, setActiveFilters] = useState<Record<string, string>>({});
@@ -246,13 +248,32 @@ export function ResourceTable<T extends Record<string, string>>({
                     column.header.toLowerCase().includes("status") ||
                     column.header.toLowerCase().includes("risk");
                   const isEmailAction = column.cellType === "email-action";
+                  const isPaymentAction = column.cellType === "payment-action";
+                  const isMemberView = column.cellType === "member-view";
 
                   return (
                     <TableCell key={column.id ?? (column.key ? String(column.key) : `col-${columnIndex}`)} className="text-[15px]">
-                      {isEmailAction ? (
+                      {isMemberView ? (
+                        <Button
+                          onClick={() => onMemberView?.(row["id"] as (string | number))}
+                          variant="outline"
+                          className="h-9 rounded-full px-4 text-[11px] font-semibold uppercase tracking-[0.16em]"
+                        >
+                          View
+                        </Button>
+                      ) : isEmailAction ? (
                         <Button asChild variant="outline" className="h-9 rounded-full px-3.5 text-[11px] font-semibold uppercase tracking-[0.16em]">
                           <a href={`mailto:${value}`}>Email</a>
                         </Button>
+                      ) : isPaymentAction ? (
+                        row["status"] === "Pending" ? (
+                          <Button
+                            onClick={() => onPaymentConfirm?.(row["id"] as number)}
+                            className="h-9 rounded-full px-3.5 text-[11px] font-semibold uppercase tracking-[0.16em]"
+                          >
+                            Confirm
+                          </Button>
+                        ) : null
                       ) : isStatus ? (
                         <Badge variant="secondary" className={statusBadgeClass(value)}>
                           {value}

@@ -1,10 +1,28 @@
 import { ResourcePage } from "@/components/admin/resource-page";
 import { getSuperAdminOverview } from "@/lib/super-admin/data";
+import { getMemberDetails } from "./actions";
+import { MemberSheet } from "@/components/admin/member-sheet";
+import { redirect } from "next/navigation";
 
-export default async function MembersPage() {
+export default async function MembersPage({
+  searchParams,
+}: {
+  searchParams: { memberId?: string };
+}) {
   const overview = await getSuperAdminOverview();
+  
+  let details = null;
+  if (searchParams?.memberId) {
+    details = await getMemberDetails(searchParams.memberId);
+  }
+
+  async function handleMemberView(id: string | number) {
+    "use server";
+    redirect(`/admin/members?memberId=${id}`);
+  }
 
   return (
+    <>
     <ResourcePage
       title="Members"
       actionLabel="Add member"
@@ -25,7 +43,7 @@ export default async function MembersPage() {
           header: "Actions",
           id: "actions",
           key: "email",
-          cellType: "email-action",
+          cellType: "member-view",
         },
       ]}
       rows={overview.members}
@@ -36,6 +54,10 @@ export default async function MembersPage() {
         { key: "plan", label: "Plan", options: [...new Set(overview.members.map((item) => item.plan))] },
       ]}
       dateKey="joined"
+      onMemberView={handleMemberView}
     />
+    
+    {details && <MemberSheet details={details} />}
+    </>
   );
 }
