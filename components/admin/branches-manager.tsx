@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useTransition, useEffect, useCallback } from "react";
-import { MapPin, Users, X } from "lucide-react";
+import { MapPin, Users, X, Edit2, Building2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { AdminPageTransition } from "@/components/admin/page-transition";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
@@ -107,124 +107,145 @@ export function BranchesManager({
 
   return (
     <AdminPageTransition>
-      <div className="space-y-8">
+      <div className="space-y-10">
         <AdminPageHeader title="Branches" actionLabel={`${branches.length} locations`} />
 
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {branches.map((branch) => (
-            <Card key={branch.id} className="rounded-[28px]">
-              <CardHeader className="gap-4">
-                <div className="space-y-2">
-                  <CardTitle className="font-display text-3xl font-black uppercase tracking-tight">
+          {branches.map((branch, index) => (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1, duration: 0.4 }}
+              key={branch.id}
+              className="group relative flex flex-col justify-between overflow-hidden rounded-[32px] border border-border bg-card p-8 transition-all hover:border-white/20 hover:shadow-2xl"
+            >
+              {/* Decorative Background Element */}
+              <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary/5 blur-[60px] transition-all group-hover:bg-primary/10" />
+
+              <div className="relative z-10 flex items-start justify-between gap-4">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Building2 className="size-4 text-primary" />
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                      Branch
+                    </span>
+                  </div>
+                  <h3 className="font-display text-3xl font-black uppercase tracking-tight text-foreground">
                     {branch.name}
-                  </CardTitle>
-                  <CardDescription className="flex items-start gap-2 text-sm">
-                    <MapPin className="mt-0.5 size-4 shrink-0 text-accent" />
-                    <span>{branch.location}</span>
-                  </CardDescription>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-5">
-                <div className="rounded-2xl border border-border bg-secondary/55 p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Active members
+                  </h3>
+                  <p className="flex items-center gap-1.5 text-sm text-muted-foreground font-medium">
+                    <MapPin className="size-3.5" />
+                    {branch.location}
                   </p>
-                  <div className="mt-3 flex items-center gap-3">
-                    <Users className="size-5 text-accent" />
-                    <span className="font-display text-4xl font-black tracking-tight">
+                </div>
+
+                <button
+                  onClick={() => openEditor(branch)}
+                  className="flex size-10 shrink-0 items-center justify-center rounded-full border border-border bg-background/50 text-muted-foreground transition-all hover:bg-foreground hover:text-background hover:border-foreground"
+                  aria-label="Edit branch"
+                >
+                  <Edit2 className="size-4" />
+                </button>
+              </div>
+
+              <div className="relative z-10 mt-10 flex items-end justify-between border-t border-border/50 pt-6">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                    Home Members
+                  </p>
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-display text-4xl font-black tracking-tighter text-foreground leading-none">
                       {branch.activeMembers}
+                    </span>
+                    <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/60">
+                      Active
                     </span>
                   </div>
                 </div>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-11 w-full rounded-2xl px-5 text-xs font-semibold uppercase tracking-[0.16em]"
-                  onClick={() => openEditor(branch)}
-                >
-                  Edit
-                </Button>
-              </CardContent>
-            </Card>
+              </div>
+            </motion.div>
           ))}
         </div>
 
+        {/* Editor Modal */}
         {editingBranch ? (
           <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="branch-editor-title"
-        >
-            <div className="w-full max-w-lg rounded-[28px] border border-border bg-card p-6 shadow-2xl">
-              <div className="flex items-start justify-between gap-4">
+            className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="branch-editor-title"
+          >
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="w-full max-w-lg overflow-hidden rounded-[32px] border border-border bg-card shadow-2xl"
+            >
+              <div className="flex items-center justify-between border-b border-border/50 bg-secondary/30 px-8 py-6">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Edit branch
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                    Edit Location
                   </p>
-                  <h2 id="branch-editor-title" className="mt-2 font-display text-3xl font-black uppercase tracking-tight text-foreground">
+                  <h2 id="branch-editor-title" className="mt-1 font-display text-2xl font-black uppercase tracking-tight text-foreground">
                     {editingBranch.name}
                   </h2>
                 </div>
-                <Button
+                <button
                   type="button"
-                  variant="ghost"
-                  size="icon-sm"
                   onClick={closeEditor}
                   disabled={isPending}
+                  className="flex size-8 items-center justify-center rounded-full bg-background/50 text-muted-foreground hover:bg-foreground hover:text-background transition-colors"
                   aria-label="Close branch editor"
                 >
                   <X className="size-4" />
-                </Button>
+                </button>
               </div>
 
-              <div className="mt-6 space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="branch-name">Branch name</Label>
+              <div className="p-8 space-y-6">
+                <div className="space-y-2.5">
+                  <Label htmlFor="branch-name" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Branch name</Label>
                   <Input
                     id="branch-name"
                     value={editingBranch.name}
                     onChange={(event) => updateField("name", event.target.value)}
-                    className="h-11 rounded-2xl"
+                    className="h-12 rounded-2xl bg-secondary/20"
                     disabled={isPending}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="branch-location">Location</Label>
+                <div className="space-y-2.5">
+                  <Label htmlFor="branch-location" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Location</Label>
                   <Input
                     id="branch-location"
                     value={editingBranch.location}
                     onChange={(event) => updateField("location", event.target.value)}
-                    className="h-11 rounded-2xl"
+                    className="h-12 rounded-2xl bg-secondary/20"
                     disabled={isPending}
                   />
                 </div>
                 {errorMessage ? (
-                  <p className="text-sm text-destructive">{errorMessage}</p>
+                  <p className="text-sm font-medium text-destructive bg-destructive/10 px-4 py-3 rounded-xl">{errorMessage}</p>
                 ) : null}
-              </div>
 
-              <div className="mt-6 flex flex-wrap justify-end gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-11 rounded-2xl px-5 text-xs font-semibold uppercase tracking-[0.16em]"
-                  onClick={closeEditor}
-                  disabled={isPending}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  className="h-11 rounded-2xl px-5 text-xs font-semibold uppercase tracking-[0.16em]"
-                  onClick={saveBranch}
-                  disabled={isPending}
-                >
-                  {isPending ? "Saving..." : "Save changes"}
-                </Button>
+                <div className="mt-8 flex items-center justify-end gap-3 pt-4 border-t border-border/50">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-12 rounded-2xl px-6 text-xs font-bold uppercase tracking-[0.16em] hover:bg-secondary/50"
+                    onClick={closeEditor}
+                    disabled={isPending}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    className="h-12 rounded-2xl px-8 text-xs font-bold uppercase tracking-[0.16em]"
+                    onClick={saveBranch}
+                    disabled={isPending}
+                  >
+                    {isPending ? "Saving..." : "Save changes"}
+                  </Button>
+                </div>
               </div>
-            </div>
+            </motion.div>
           </div>
         ) : null}
       </div>

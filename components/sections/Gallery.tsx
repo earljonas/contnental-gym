@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useEffectEvent, useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { X } from "lucide-react";
 import Image from "next/image";
 
 const galleryItems = [
@@ -23,6 +24,9 @@ export function Gallery() {
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
   const animRef = useRef<number | null>(null);
+  const dragStartPos = useRef<{ x: number; y: number } | null>(null);
+
+  const [selectedImage, setSelectedImage] = useState<{ src: string; alt: string } | null>(null);
 
   // Duplicate items for seamless infinite loop
   const items = [...galleryItems, ...galleryItems];
@@ -30,7 +34,7 @@ export function Gallery() {
   // Auto-scroll loop
   const animate = useEffectEvent(() => {
     const track = trackRef.current;
-    if (track && !isDragging) {
+    if (track && !isDragging && !selectedImage) {
       track.scrollLeft += 0.6;
 
       // Reset seamlessly when halfway
@@ -51,13 +55,14 @@ export function Gallery() {
     return () => {
       if (animRef.current) cancelAnimationFrame(animRef.current);
     };
-  }, [isDragging]);
+  }, [isDragging, selectedImage]);
 
   // Mouse drag handlers
   const onMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);
     setStartX(e.pageX - (trackRef.current?.offsetLeft || 0));
     setScrollLeft(trackRef.current?.scrollLeft || 0);
+    dragStartPos.current = { x: e.pageX, y: e.pageY };
   };
   const onMouseMove = (e: React.MouseEvent) => {
     if (!isDragging || !trackRef.current) return;
@@ -72,6 +77,7 @@ export function Gallery() {
     setIsDragging(true);
     setStartX(e.touches[0].pageX - (trackRef.current?.offsetLeft || 0));
     setScrollLeft(trackRef.current?.scrollLeft || 0);
+    dragStartPos.current = { x: e.touches[0].pageX, y: e.touches[0].pageY };
   };
   const onTouchMove = (e: React.TouchEvent) => {
     if (!isDragging || !trackRef.current) return;
@@ -79,6 +85,27 @@ export function Gallery() {
     trackRef.current.scrollLeft = scrollLeft - (x - startX) * 1.5;
   };
   const onTouchEnd = () => setIsDragging(false);
+
+  // Click handler that ignores clicks if it was a drag
+  const handleImageClick = (item: typeof galleryItems[number], e: React.MouseEvent | React.TouchEvent) => {
+    if (dragStartPos.current) {
+      let clientX, clientY;
+      if ("touches" in e) {
+        clientX = (e as React.TouchEvent).changedTouches[0].pageX;
+        clientY = (e as React.TouchEvent).changedTouches[0].pageY;
+      } else {
+        clientX = (e as React.MouseEvent).pageX;
+        clientY = (e as React.MouseEvent).pageY;
+      }
+      const dx = Math.abs(clientX - dragStartPos.current.x);
+      const dy = Math.abs(clientY - dragStartPos.current.y);
+      if (dx > 5 || dy > 5) {
+        // Was a drag, do not open
+        return;
+      }
+    }
+    setSelectedImage(item);
+  };
 
   return (
     <section className="bg-section-alt py-20 md:py-28 overflow-hidden">
@@ -120,21 +147,24 @@ export function Gallery() {
           {items.map((item, i) => (
             <div
               key={`${item.src}-${i}`}
-              className="relative shrink-0 overflow-hidden rounded-lg"
+              className="relative shrink-0 overflow-hidden rounded-lg group"
               style={{
                 width: "clamp(260px, 26vw, 380px)",
                 aspectRatio: "3 / 4",
               }}
+              onClick={(e) => handleImageClick(item, e)}
+              onTouchEnd={(e) => handleImageClick(item, e)}
             >
               <Image
                 src={item.src}
                 alt={item.alt}
                 fill
-                className="pointer-events-none object-cover"
+                className="pointer-events-none object-cover transition-transform duration-700 group-hover:scale-105"
                 sizes="(max-width: 768px) 70vw, 26vw"
                 quality={75}
                 draggable={false}
               />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300 pointer-events-none" />
             </div>
           ))}
         </div>
@@ -143,6 +173,44 @@ export function Gallery() {
         <div className="pointer-events-none absolute inset-y-0 left-0 w-20 bg-gradient-to-r from-[#111111] to-transparent" />
         <div className="pointer-events-none absolute inset-y-0 right-0 w-20 bg-gradient-to-l from-[#111111] to-transparent" />
       </motion.div>
+
+      {/* Lightbox Modal */}
+      <AnimatePresence>
+        {selectedImage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 px-4 py-8 backdrop-blur-sm"
+            onClick={() => setSelectedImage(null)}
+          >
+            <button
+              className="absolute top-4 right-4 md:top-8 md:right-8 z-50 text-white/50 hover:text-white transition-colors p-2"
+              onClick={() => setSelectedImage(null)}
+            >
+              <X className="size-8" />
+            </button>
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="relative h-full w-full max-w-6xl flex items-center justify-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Image
+                src={selectedImage.src}
+                alt={selectedImage.alt}
+                fill
+                className="object-contain"
+                sizes="100vw"
+                quality={100}
+                priority
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </section>
   );
 }

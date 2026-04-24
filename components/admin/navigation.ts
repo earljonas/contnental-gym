@@ -6,7 +6,6 @@ import {
   LayoutDashboard,
   LineChart,
   Users,
-  WalletCards,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -22,7 +21,6 @@ type AdminNavItem = {
 const adminNav: AdminNavItem[] = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/members", label: "Members", icon: Users },
-  { href: "/admin/plans", label: "Plans", icon: WalletCards },
   { href: "/admin/billing", label: "Billing", icon: CreditCard },
   { href: "/admin/attendance", label: "Attendance", icon: Activity },
   { href: "/super-admin/branches", label: "Branches", icon: Building2, roles: ["SUPER_ADMIN"] },
@@ -33,3 +31,4 @@ const adminNav: AdminNavItem[] = [
 export function getAdminNav(role: AppRole) {
   return adminNav.filter((item) => !item.roles || item.roles.includes(role));
 }
+
