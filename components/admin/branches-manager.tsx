@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, useEffect, useCallback } from "react";
-import { MapPin, Users, X, Edit2, Building2 } from "lucide-react";
+import { MapPin, Users, X, Edit2, Building2, UserCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 
@@ -17,6 +17,7 @@ export type BranchCard = {
   name: string;
   location: string;
   activeMembers: number;
+  adminName?: string;
 };
 
 type EditState = {
@@ -137,6 +138,12 @@ export function BranchesManager({
                     <MapPin className="size-3.5" />
                     {branch.location}
                   </p>
+                  {branch.adminName ? (
+                    <p className="flex items-center gap-1.5 text-sm text-muted-foreground/80 font-medium">
+                      <UserCircle className="size-3.5" />
+                      {branch.adminName}
+                    </p>
+                  ) : null}
                 </div>
 
                 <button

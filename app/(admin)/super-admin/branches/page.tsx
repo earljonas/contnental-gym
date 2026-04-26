@@ -12,17 +12,30 @@ type ProfileMembershipRow = {
   memberships: { status: string }[] | null;
 };
 
+type AdminRow = {
+  first_name: string;
+  last_name: string;
+  branch_id: number | null;
+};
+
 export default async function SuperAdminBranchesPage() {
   const supabase = await createClient();
 
-  const [{ data: branches, error: branchesError }, { data: profiles, error: profilesError }] =
-    await Promise.all([
-      supabase.from("branches").select("id, name, location").order("name"),
-      supabase
-        .from("profiles")
-        .select("branch_id, memberships(status)")
-        .eq("role", "MEMBER"),
-    ]);
+  const [
+    { data: branches, error: branchesError },
+    { data: profiles, error: profilesError },
+    { data: admins, error: adminsError },
+  ] = await Promise.all([
+    supabase.from("branches").select("id, name, location").order("name"),
+    supabase
+      .from("profiles")
+      .select("branch_id, memberships(status)")
+      .eq("role", "MEMBER"),
+    supabase
+      .from("profiles")
+      .select("first_name, last_name, branch_id")
+      .eq("role", "BRANCH_ADMIN"),
+  ]);
 
   if (branchesError || profilesError) {
     return (
@@ -48,11 +61,19 @@ export default async function SuperAdminBranchesPage() {
     );
   }
 
+  const adminByBranch = new Map<number, string>();
+  for (const admin of (admins ?? []) as AdminRow[]) {
+    if (admin.branch_id) {
+      adminByBranch.set(admin.branch_id, `${admin.first_name} ${admin.last_name}`.trim());
+    }
+  }
+
   const branchCards: BranchCard[] = ((branches ?? []) as BranchRow[]).map((branch) => ({
     id: branch.id,
     name: branch.name,
     location: branch.location ?? "Location unavailable",
     activeMembers: activeMembersByBranch.get(branch.id) ?? 0,
+    adminName: adminByBranch.get(branch.id),
   }));
 
   return <BranchesManager initialBranches={branchCards} />;

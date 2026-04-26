@@ -2,10 +2,25 @@ import { ResourcePage } from "@/components/admin/resource-page";
 import { RevenueOutstandingChart } from "@/components/admin/data-charts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSuperAdminOverview } from "@/lib/super-admin/data";
+import { createClient } from "@/lib/supabase/server";
 import { confirmPayment } from "./actions";
+import { RecordPaymentButton } from "./record-payment";
 
 export default async function BillingPage() {
   const overview = await getSuperAdminOverview();
+  const supabase = await createClient();
+
+  // Fetch members for the record payment dialog
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, first_name, last_name")
+    .eq("role", "MEMBER")
+    .order("first_name");
+
+  const memberOptions = (profiles ?? []).map((p) => ({
+    id: p.id as string,
+    name: `${p.first_name} ${p.last_name}`.trim(),
+  }));
 
   return (
     <ResourcePage
@@ -17,6 +32,7 @@ export default async function BillingPage() {
         { label: "Overdue", value: overview.payments.filter((item) => item.status === "Overdue").length.toString() },
         { label: "Tracked payments", value: overview.payments.length.toString() },
       ]}
+      headerAction={<RecordPaymentButton members={memberOptions} />}
       tableTitle="Transactions"
       columns={[
         { header: "Member", key: "member" },

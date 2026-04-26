@@ -42,7 +42,7 @@ export function MemberSheet({ details }: { details: any }) {
                 {details.profile.email} &mdash; {details.profile.role}
               </SheetDescription>
             </div>
-            <Badge variant={currentStatus === "Active" ? "secondary" : "destructive"}>
+            <Badge variant={currentStatus === "Active" ? "secondary" : "danger"}>
               {currentStatus}
             </Badge>
           </div>

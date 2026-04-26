@@ -1,6 +1,6 @@
 "use client";
 
-import { Menu, Moon, Sun } from "lucide-react";
+import { Building2, Menu, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { AdminSidebar } from "@/components/admin/sidebar";
@@ -17,12 +17,14 @@ export function AdminShell({
   children,
   role,
   userName,
+  branchName,
   initialTheme,
   initialSidebarCollapsed,
 }: {
   children: React.ReactNode;
   role: AppRole;
   userName: string;
+  branchName?: string;
   initialTheme: AdminTheme;
   initialSidebarCollapsed: boolean;
 }) {
@@ -87,6 +89,12 @@ export function AdminShell({
               <Menu className="size-4" />
             </Button>
             <div className="ml-auto flex items-center gap-2 sm:gap-3">
+              {branchName ? (
+                <span className="hidden sm:flex items-center gap-2 rounded-2xl border border-border bg-secondary/40 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  <Building2 className="size-3.5" />
+                  {branchName}
+                </span>
+              ) : null}
               <Button
                 type="button"
                 variant="outline"
