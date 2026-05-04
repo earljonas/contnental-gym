@@ -31,11 +31,17 @@ export function MemberShell({
   membershipStatus,
 }: MemberShellProps) {
   const pathname = usePathname();
+  const isSessionPage = pathname.startsWith("/dashboard/session");
 
   const isActive = (href: string) => {
     if (href === "/dashboard") return pathname === "/dashboard";
     return pathname.startsWith(href);
   };
+
+  // Hide shell during active session for distraction-free workout
+  if (isSessionPage) {
+    return <div className="min-h-screen bg-background">{children}</div>;
+  }
 
   return (
     <div className="min-h-screen bg-background">

@@ -266,14 +266,14 @@ export function MemberHome({
 
       {/* ═══ Quick Action Row ═══ */}
       <div className="grid grid-cols-3 gap-3">
-        <button className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card px-4 py-5 transition-all hover:bg-muted active:scale-[0.97]">
+        <Link href="/dashboard/session" className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card px-4 py-5 transition-all hover:bg-muted active:scale-[0.97]">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#C9973E]/10">
             <ClipboardList className="size-5 text-[#C9973E]" />
           </div>
           <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground">
             Log Workout
           </span>
-        </button>
+        </Link>
 
         <button className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card px-4 py-5 transition-all hover:bg-muted active:scale-[0.97]">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#C9973E]/10">
@@ -315,14 +315,14 @@ export function MemberHome({
               plan here.
             </p>
             <div className="mt-5 flex gap-3">
-              <button className="flex items-center gap-2 rounded-xl bg-[#C9973E] px-5 py-3 text-[12px] font-semibold uppercase tracking-wider text-black transition-all hover:bg-[#B8882F] active:scale-[0.98]">
+              <Link href="/dashboard/session" className="flex items-center gap-2 rounded-xl bg-[#C9973E] px-5 py-3 text-[12px] font-semibold uppercase tracking-wider text-black transition-all hover:bg-[#B8882F] active:scale-[0.98]">
                 <Play className="size-4" />
                 Start Session
-              </button>
-              <button className="flex items-center gap-2 rounded-xl border border-border px-5 py-3 text-[12px] font-semibold uppercase tracking-wider text-foreground transition-all hover:bg-muted active:scale-[0.98]">
+              </Link>
+              <Link href="/dashboard/workouts" className="flex items-center gap-2 rounded-xl border border-border px-5 py-3 text-[12px] font-semibold uppercase tracking-wider text-foreground transition-all hover:bg-muted active:scale-[0.98]">
                 <ClipboardList className="size-4" />
                 Build Routine
-              </button>
+              </Link>
             </div>
           </div>
         </div>
