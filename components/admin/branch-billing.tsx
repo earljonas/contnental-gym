@@ -11,7 +11,7 @@ import {
   Plus,
   X,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { AdminPageTransition } from "@/components/admin/page-transition";
@@ -393,7 +393,7 @@ function RecordPaymentModal({
               onClick={handleSubmit}
               disabled={isPending}
             >
-              {isPending ? "Saving..." : "Confirm Payment"}
+              {isPending ? "Saving..." : "Record Payment"}
             </Button>
           </div>
         </div>

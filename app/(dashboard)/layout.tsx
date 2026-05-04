@@ -39,7 +39,6 @@ export default async function DashboardLayout({
   return (
     <MemberShell
       userName={profile?.first_name ?? "Member"}
-      userId={user.id}
       membershipStatus={membership?.status ?? null}
     >
       {children}

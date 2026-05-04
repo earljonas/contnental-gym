@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDown, ChevronUp, Megaphone } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { AdminPageTransition } from "@/components/admin/page-transition";
@@ -68,6 +68,7 @@ function AnnouncementCard({
       <button
         type="button"
         onClick={onToggle}
+        aria-expanded={isExpanded}
         className="w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <CardHeader className="flex-row items-start justify-between gap-4 space-y-0 p-6">

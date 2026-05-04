@@ -143,6 +143,7 @@ export type MemberLookup = {
   name: string;
   avatarUrl: string | null;
   membershipStatus: "ACTIVE" | "EXPIRED" | "PENDING" | "CANCELLED" | "NONE";
+  branchId: number | null;
 };
 
 export type SearchableMember = {
@@ -263,7 +264,7 @@ export async function lookupMemberForCheckIn(memberId: string): Promise<MemberLo
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, first_name, last_name, avatar_url, memberships(status)")
+    .select("id, first_name, last_name, avatar_url, branch_id, memberships(status)")
     .eq("id", memberId)
     .eq("role", "MEMBER")
     .single();
@@ -288,16 +289,18 @@ export async function lookupMemberForCheckIn(memberId: string): Promise<MemberLo
     name: `${profile.first_name} ${profile.last_name}`.trim(),
     avatarUrl: profile.avatar_url ?? null,
     membershipStatus: status,
+    branchId: profile.branch_id,
   };
 }
 
-export async function getSearchableMembers(): Promise<SearchableMember[]> {
+export async function getSearchableMembers(branchId: number): Promise<SearchableMember[]> {
   const supabase = await createClient();
 
   const { data } = await supabase
     .from("profiles")
     .select("id, first_name, last_name")
     .eq("role", "MEMBER")
+    .eq("branch_id", branchId)
     .order("first_name");
 
   return (data ?? []).map((p) => ({
@@ -365,7 +368,7 @@ export async function getBranchMembers(branchId: number): Promise<BranchMembersD
     .from("profiles")
     .select(`
       id, first_name, last_name, email, created_at,
-      memberships(id, status, plan_id, membership_plans(name)),
+      memberships(id, status, plan_id, created_at, membership_plans(name)),
       attendance(check_in_time)
     `)
     .eq("role", "MEMBER")
@@ -374,7 +377,8 @@ export async function getBranchMembers(branchId: number): Promise<BranchMembersD
 
   const members: MemberRow[] = (profiles ?? []).map((p) => {
     const memberships = Array.isArray(p.memberships) ? p.memberships : [];
-    const latestMembership = memberships[0];
+    const sortedMemberships = [...memberships].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    const latestMembership = sortedMemberships[0];
     const plan = latestMembership?.membership_plans as unknown as { name: string } | null;
 
     const attendanceList = Array.isArray(p.attendance) ? p.attendance : [];
@@ -428,8 +432,9 @@ export async function getBranchMemberDetails(
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, first_name, last_name, email, phone, avatar_url, created_at")
+    .select("id, first_name, last_name, email, phone, avatar_url, created_at, branch_id")
     .eq("id", memberId)
+    .eq("branch_id", branchId)
     .single();
 
   if (!profile) return null;
@@ -590,14 +595,15 @@ export async function getBillingMemberOptions(
 
   const { data } = await supabase
     .from("profiles")
-    .select("id, first_name, last_name, memberships(membership_plans(price))")
+    .select("id, first_name, last_name, memberships(created_at, membership_plans(price))")
     .eq("role", "MEMBER")
     .eq("branch_id", branchId)
     .order("first_name");
 
   return (data ?? []).map((p) => {
     const memberships = Array.isArray(p.memberships) ? p.memberships : [];
-    const latestPlan = memberships[0]?.membership_plans as unknown as { price: number } | null;
+    const sortedMemberships = [...memberships].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    const latestPlan = sortedMemberships[0]?.membership_plans as unknown as { price: number } | null;
 
     return {
       id: p.id,

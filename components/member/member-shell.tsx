@@ -15,7 +15,6 @@ import { cn } from "@/lib/utils";
 interface MemberShellProps {
   children: React.ReactNode;
   userName: string;
-  userId: string;
   membershipStatus: string | null;
 }
 
@@ -29,7 +28,6 @@ const NAV_ITEMS = [
 export function MemberShell({
   children,
   userName,
-  userId,
   membershipStatus,
 }: MemberShellProps) {
   const pathname = usePathname();

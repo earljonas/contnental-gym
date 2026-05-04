@@ -16,7 +16,7 @@ import {
   TrendingUp,
   X,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
 
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { AdminPageTransition } from "@/components/admin/page-transition";
@@ -80,16 +80,18 @@ const feedbackConfig = {
 
 // ── QR Scanner Component ──
 
+type Html5QrcodeType = InstanceType<typeof import("html5-qrcode").Html5Qrcode>;
+
 function QrScanner({ onScan, enabled }: { onScan: (code: string) => void; enabled: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const scannerRef = useRef<any>(null);
+  const scannerRef = useRef<Html5QrcodeType | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!enabled || !containerRef.current) return;
 
-    let html5QrCode: any = null;
+    let html5QrCode: Html5QrcodeType | null = null;
     let mounted = true;
 
     async function startScanner() {
@@ -116,10 +118,11 @@ function QrScanner({ onScan, enabled }: { onScan: (code: string) => void; enable
         );
 
         if (mounted) setCameraActive(true);
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (mounted) {
+          const message = err instanceof Error ? err.message : typeof (err as any)?.message === "string" ? (err as any).message : "Unknown error";
           setCameraError(
-            err?.message?.includes("NotAllowed")
+            message.includes("NotAllowed")
               ? "Camera access denied. Please allow camera permissions."
               : "Unable to start camera. Try the manual check-in below."
           );

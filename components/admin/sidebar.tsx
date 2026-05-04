@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, PanelLeftClose, PanelLeftOpen, UserRound, X } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { useEffect, useCallback, useRef } from "react";
 
 import { getAdminNav, getBranchAdminNav } from "@/components/admin/navigation";

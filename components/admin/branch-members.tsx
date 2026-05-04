@@ -350,9 +350,13 @@ export function BranchMembersPage({
         </div>
 
         {/* Tab bar */}
-        <div className="flex items-center gap-1 rounded-2xl border border-border bg-secondary/30 p-1 w-fit">
+        <div role="tablist" className="flex items-center gap-1 rounded-2xl border border-border bg-secondary/30 p-1 w-fit">
           <button
             type="button"
+            role="tab"
+            id="tab-members-tab"
+            aria-selected={activeTab === "members"}
+            aria-controls="tab-members-panel"
             onClick={() => setActiveTab("members")}
             className={`rounded-xl px-5 py-2.5 text-[11px] font-bold uppercase tracking-[0.16em] transition-colors ${
               activeTab === "members"
@@ -364,6 +368,10 @@ export function BranchMembersPage({
           </button>
           <button
             type="button"
+            role="tab"
+            id="tab-walkups-tab"
+            aria-selected={activeTab === "walkups"}
+            aria-controls="tab-walkups-panel"
             onClick={() => setActiveTab("walkups")}
             className={`rounded-xl px-5 py-2.5 text-[11px] font-bold uppercase tracking-[0.16em] transition-colors ${
               activeTab === "walkups"
@@ -382,7 +390,7 @@ export function BranchMembersPage({
 
         {/* ── Branch Members Tab ── */}
         {activeTab === "members" && (
-          <Card className="rounded-[30px]">
+          <Card id="tab-members-panel" role="tabpanel" aria-labelledby="tab-members-tab" className="rounded-[30px]">
             <CardHeader className="border-b border-border/70 p-6">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <CardTitle>Directory</CardTitle>
@@ -518,7 +526,7 @@ export function BranchMembersPage({
 
         {/* ── Pending Walkups Tab ── */}
         {activeTab === "walkups" && (
-          <Card className="rounded-[30px]">
+          <Card id="tab-walkups-panel" role="tabpanel" aria-labelledby="tab-walkups-tab" className="rounded-[30px]">
             <CardHeader className="flex-row items-center justify-between space-y-0 border-b border-border/70 p-6">
               <div>
                 <CardTitle>Pending Walkups</CardTitle>

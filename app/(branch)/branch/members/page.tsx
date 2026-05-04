@@ -12,7 +12,7 @@ import { getUserRole } from "@/lib/supabase/roles";
 async function getPendingWalkups() {
   const supabase = await createClient();
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("profiles")
     .select(
       "id, first_name, last_name, email, created_at, memberships(id, status, plan_id, membership_plans(name, price))"
@@ -20,6 +20,11 @@ async function getPendingWalkups() {
     .eq("role", "MEMBER")
     .is("branch_id", null)
     .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("[getPendingWalkups] Error fetching profiles:", error);
+    throw new Error("Failed to fetch pending walkups");
+  }
 
   return (data ?? [])
     .filter((profile) => {

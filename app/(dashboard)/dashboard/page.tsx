@@ -14,14 +14,24 @@ export default async function DashboardPage() {
     .eq("id", user!.id)
     .single();
 
+  type MembershipWithPlan = {
+    status: string;
+    start_date: string | null;
+    end_date: string | null;
+    plan_id: number;
+    membership_plans: { name: string; price: number } | null;
+  };
+
   // ── Latest membership with end_date ──
-  const { data: membership } = await supabase
+  const { data: membershipData } = await supabase
     .from("memberships")
     .select("status, start_date, end_date, plan_id, membership_plans(name, price)")
     .eq("user_id", user!.id)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+
+  const membership = membershipData as MembershipWithPlan | null;
 
   // ── This week's attendance (Mon–Sun) ──
   const now = new Date();
@@ -90,10 +100,7 @@ export default async function DashboardPage() {
   const sessionsThisWeek = weekDays.filter((d) => d.hasWorkout).length;
 
   // ── Membership status info ──
-  const plan = membership?.membership_plans as unknown as {
-    name: string;
-    price: number;
-  } | null;
+  const plan = membership?.membership_plans;
 
   let daysLeft: number | null = null;
   if (membership?.end_date) {

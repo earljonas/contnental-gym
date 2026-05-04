@@ -18,6 +18,16 @@ export async function manualCheckInFromMembers(memberId: string) {
       return { error: "Unauthorized" };
     }
 
+    const { data: targetProfile } = await supabase
+      .from("profiles")
+      .select("branch_id")
+      .eq("id", memberId)
+      .single();
+
+    if (!targetProfile || targetProfile.branch_id !== roleInfo.branch_id) {
+      return { error: "Member does not belong to your branch" };
+    }
+
     // Verify member has active membership
     const { data: memberships } = await supabase
       .from("memberships")

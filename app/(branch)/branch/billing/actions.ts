@@ -22,6 +22,17 @@ export async function confirmBranchPayment(data: {
       return { error: "Unauthorized" };
     }
 
+    const { data: payment } = await supabase
+      .from("payments")
+      .select("status, profiles!inner(branch_id)")
+      .eq("id", data.paymentId)
+      .single();
+
+    const profile = payment?.profiles as unknown as { branch_id: number | null } | null;
+    if (!payment || profile?.branch_id !== roleInfo.branch_id || payment.status !== "PENDING") {
+      return { error: "Payment not found or cannot be confirmed" };
+    }
+
     const { error } = await supabase
       .from("payments")
       .update({
@@ -64,6 +75,16 @@ export async function recordBranchPayment(formData: {
     const roleInfo = await getUserRole(supabase, user.id);
     if (roleInfo.role !== "BRANCH_ADMIN") {
       return { error: "Unauthorized" };
+    }
+
+    const { data: targetProfile } = await supabase
+      .from("profiles")
+      .select("branch_id")
+      .eq("id", formData.userId)
+      .single();
+
+    if (!targetProfile || targetProfile.branch_id !== roleInfo.branch_id) {
+      return { error: "Member does not belong to your branch" };
     }
 
     // Find the member's latest membership to link the payment

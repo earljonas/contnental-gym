@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 
 const plans = [
   { name: "Day Pass", duration: "Single Entry", price: 200, tag: "Drop-in" },

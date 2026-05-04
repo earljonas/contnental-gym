@@ -26,6 +26,10 @@ export async function checkInMember(
     const member = await lookupMemberForCheckIn(memberId);
     if (!member) return { error: "Member not found" };
 
+    if (member.branchId !== roleInfo.branch_id) {
+      return { error: "Member not assigned to this branch" };
+    }
+
     // Only allow check-in for active members
     if (member.membershipStatus !== "ACTIVE") {
       return { member, error: `Membership is ${member.membershipStatus}` };
@@ -56,8 +60,25 @@ export async function lookupMemberAction(
   memberId: string
 ): Promise<{ member?: MemberLookup; error?: string }> {
   try {
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { error: "Not authenticated" };
+
+    const roleInfo = await getUserRole(supabase, user.id);
+    if (roleInfo.role !== "BRANCH_ADMIN" || !roleInfo.branch_id) {
+      return { error: "Unauthorized" };
+    }
+
     const member = await lookupMemberForCheckIn(memberId);
     if (!member) return { error: "Member not found" };
+
+    if (member.branchId !== roleInfo.branch_id) {
+      return { error: "Member not assigned to this branch" };
+    }
+
     return { member };
   } catch {
     return { error: "Lookup failed" };

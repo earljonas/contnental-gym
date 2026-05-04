@@ -27,7 +27,7 @@ export default async function AttendancePage({
 
   const [data, members] = await Promise.all([
     getBranchAttendance(roleInfo.branch_id, dateFilter),
-    getSearchableMembers(),
+    getSearchableMembers(roleInfo.branch_id),
   ]);
 
   return (

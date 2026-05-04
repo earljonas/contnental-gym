@@ -294,8 +294,9 @@ export function MemberHome({
           {/* 7-day strip */}
           <div className="mt-6 flex w-full justify-between">
             {weekDays.map((day) => {
-              const isToday =
-                day.date === new Date().toISOString().split("T")[0];
+              const now = new Date();
+              const localTodayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+              const isToday = day.date === localTodayStr;
               const isSelected = selectedDay === day.date;
 
               return (
