@@ -233,6 +233,33 @@ export function BranchTrafficStack() {
   );
 }
 
+export function RevenueByBranchChart() {
+  const data = [
+    { month: "Jan", Ecoland: 120000, Torres: 130000, Lanang: 70000 },
+    { month: "Feb", Ecoland: 135000, Torres: 140000, Lanang: 81000 },
+    { month: "Mar", Ecoland: 142000, Torres: 148000, Lanang: 91000 },
+    { month: "Apr", Ecoland: 150000, Torres: 155000, Lanang: 97000 },
+    { month: "May", Ecoland: 158000, Torres: 168000, Lanang: 104000 },
+    { month: "Jun", Ecoland: 175000, Torres: 190000, Lanang: 121000 },
+  ];
+
+  return (
+    <div className="h-[280px] w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+          <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} dy={10} />
+          <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} dx={-10} tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
+          <Tooltip content={<CustomTooltip />} cursor={{ fill: "var(--border)" }} />
+          <Bar dataKey="Torres" stackId="revenue" fill={STYLES.rose.fill} radius={[0, 0, 4, 4]} />
+          <Bar dataKey="Lanang" stackId="revenue" fill={STYLES.amber.fill} />
+          <Bar dataKey="Ecoland" stackId="revenue" fill={STYLES.blue.fill} radius={[4, 4, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 export function RevenueOutstandingChart() {
   return (
     <div className="h-[180px] w-full mt-4 flex flex-col justify-between">

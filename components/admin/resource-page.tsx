@@ -20,6 +20,7 @@ export function ResourcePage<T extends Record<string, any>>({
   title,
   actionLabel,
   summary,
+  extraCards,
   tableTitle,
   columns,
   rows,
@@ -28,12 +29,14 @@ export function ResourcePage<T extends Record<string, any>>({
   filters,
   dateKey,
   charts,
+  headerAction,
   onPaymentConfirm,
   onMemberView,
 }: {
   title: string;
   actionLabel?: string;
-  summary: Summary[];
+  summary?: Summary[];
+  extraCards?: Summary[];
   tableTitle: string;
   columns: Column<T>[];
   rows: T[];
@@ -46,6 +49,7 @@ export function ResourcePage<T extends Record<string, any>>({
   }[];
   dateKey?: keyof T;
   charts?: React.ReactNode;
+  headerAction?: React.ReactNode;
   onPaymentConfirm?: (id: number) => Promise<any>;
   onMemberView?: (id: string | number) => void;
 }) {
@@ -53,21 +57,41 @@ export function ResourcePage<T extends Record<string, any>>({
     <AdminPageTransition>
       <div className="space-y-8">
         <AdminPageHeader title={title} actionLabel={actionLabel} />
+        {headerAction}
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {summary.map((item) => (
-            <Card key={item.label} className="rounded-[28px]">
-              <CardHeader className="gap-4 p-6">
-                <CardDescription className="text-[11px] font-semibold uppercase tracking-[0.18em]">
-                  {item.label}
-                </CardDescription>
-                <CardTitle className="font-display text-[clamp(2.35rem,3vw,3.2rem)] font-black uppercase leading-none tracking-tight">
-                  {item.value}
-                </CardTitle>
-              </CardHeader>
-            </Card>
-          ))}
-        </div>
+        {summary && summary.length > 0 ? (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {summary.map((item) => (
+              <Card key={item.label} className="rounded-[28px]">
+                <CardHeader className="gap-4 p-6">
+                  <CardDescription className="text-[11px] font-semibold uppercase tracking-[0.18em]">
+                    {item.label}
+                  </CardDescription>
+                  <CardTitle className="font-display text-[clamp(2.35rem,3vw,3.2rem)] font-black uppercase leading-none tracking-tight">
+                    {item.value}
+                  </CardTitle>
+                </CardHeader>
+              </Card>
+            ))}
+          </div>
+        ) : null}
+
+        {extraCards && extraCards.length > 0 ? (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {extraCards.map((item) => (
+              <Card key={item.label} className="rounded-[28px] border-dashed">
+                <CardHeader className="gap-4 p-6">
+                  <CardDescription className="text-[11px] font-semibold uppercase tracking-[0.18em]">
+                    {item.label}
+                  </CardDescription>
+                  <CardTitle className="font-display text-[clamp(2.35rem,3vw,3.2rem)] font-black uppercase leading-none tracking-tight">
+                    {item.value}
+                  </CardTitle>
+                </CardHeader>
+              </Card>
+            ))}
+          </div>
+        ) : null}
 
         {charts ? <div className="grid gap-6">{charts}</div> : null}
 

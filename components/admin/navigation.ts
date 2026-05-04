@@ -28,7 +28,19 @@ const adminNav: AdminNavItem[] = [
   { href: "/admin/announcements", label: "Announcements", icon: BellRing },
 ] as const;
 
+const branchAdminNav: AdminNavItem[] = [
+  { href: "/branch", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/branch/members", label: "Members", icon: Users },
+  { href: "/branch/attendance", label: "Attendance", icon: Activity },
+  { href: "/branch/billing", label: "Billing", icon: CreditCard },
+  { href: "/branch/announcements", label: "Announcements", icon: BellRing },
+];
+
 export function getAdminNav(role: AppRole) {
   return adminNav.filter((item) => !item.roles || item.roles.includes(role));
+}
+
+export function getBranchAdminNav() {
+  return branchAdminNav;
 }
 

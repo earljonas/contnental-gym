@@ -20,7 +20,7 @@ type Column<T> = {
   header: string;
   id?: string;
   key?: keyof T;
-  cellType?: "text" | "status" | "email-action" | "payment-action";
+  cellType?: "text" | "status" | "email-action" | "payment-action" | "member-view";
 };
 
 type FilterConfig<T> = {
@@ -57,6 +57,8 @@ export function ResourceTable<T extends Record<string, any>>({
   searchKeys,
   filters = [],
   dateKey,
+  onPaymentConfirm,
+  onMemberView,
 }: {
   columns: Column<T>[];
   rows: T[];
@@ -164,10 +166,11 @@ export function ResourceTable<T extends Record<string, any>>({
               key={String(filter.key)}
               value={activeFilters[String(filter.key)] ?? "All"}
               onChange={(event) => {
+                const value = event.target.value;
                 startTransition(() => {
                   setActiveFilters((current) => ({
                     ...current,
-                    [String(filter.key)]: event.target.value,
+                    [String(filter.key)]: value,
                   }));
                 });
               }}

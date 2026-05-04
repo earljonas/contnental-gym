@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, PanelLeftClose, PanelLeftOpen, UserRound, X } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { useEffect, useCallback, useRef } from "react";
 
-import { getAdminNav } from "@/components/admin/navigation";
+import { getAdminNav, getBranchAdminNav } from "@/components/admin/navigation";
 import { Button } from "@/components/ui/button";
 import type { AppRole } from "@/lib/supabase/roles";
 import { cn } from "@/lib/utils";
@@ -29,12 +29,14 @@ export function AdminSidebar({
   onCloseMobile: () => void;
 }) {
   const pathname = usePathname();
-  const navItems = getAdminNav(role);
+  const isBranchAdmin = role === "BRANCH_ADMIN";
+  const navItems = isBranchAdmin ? getBranchAdminNav() : getAdminNav(role);
+  const homeHref = isBranchAdmin ? "/branch" : "/admin";
 
   const isNavActive = useCallback((href: string) => {
-    if (href === "/admin") return pathname === "/admin";
+    if (href === homeHref) return pathname === homeHref;
     return pathname === href || pathname.startsWith(`${href}/`);
-  }, [pathname]);
+  }, [pathname, homeHref]);
 
   const closeTriggerRef = useRef<HTMLButtonElement>(null);
   const prevIsOpen = useRef(isOpen);
@@ -72,7 +74,7 @@ export function AdminSidebar({
         >
           {!isCollapsed ? (
             <div className="flex items-start justify-between gap-3">
-              <Link href="/admin" className="flex flex-col leading-none">
+              <Link href={homeHref} className="flex flex-col leading-none">
                 <span className="font-display text-[24px] font-black uppercase tracking-tight text-[var(--sidebar-foreground-active)]">
                   CONTNENTAL
                 </span>
@@ -127,7 +129,7 @@ export function AdminSidebar({
               >
                 {active ? (
                   <motion.span
-                    layoutId="super-admin-nav"
+                    layoutId={isBranchAdmin ? "branch-admin-nav" : "super-admin-nav"}
                     className="absolute inset-0 rounded-2xl border border-white/10 bg-white/5"
                     transition={{ type: "spring", stiffness: 320, damping: 28 }}
                   />
@@ -179,7 +181,7 @@ export function AdminSidebar({
         )}
       >
         <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-4">
-          <Link href="/admin" className="flex flex-col leading-none" onClick={onCloseMobile}>
+          <Link href={homeHref} className="flex flex-col leading-none" onClick={onCloseMobile}>
             <span className="font-display text-[22px] font-black uppercase tracking-tight text-[var(--sidebar-foreground-active)]">
               CONTNENTAL
             </span>

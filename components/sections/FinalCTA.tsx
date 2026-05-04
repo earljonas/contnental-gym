@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 
 export function FinalCTA() {
   const [email, setEmail] = useState("");

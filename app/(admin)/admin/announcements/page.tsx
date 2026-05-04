@@ -159,7 +159,7 @@ export default function AnnouncementsPage() {
                 />
               </div>
 
-              {/* TODO: Wire to server action — broadcast for Send, persist draft for Save */}
+              {/* TODO: Wire to server action — broadcast for Send */}
               <div className="flex flex-wrap gap-3">
                 <Button
                   disabled
@@ -168,14 +168,6 @@ export default function AnnouncementsPage() {
                 >
                   <SendHorizonal className="size-4" />
                   Send update
-                </Button>
-                <Button
-                  disabled
-                  title="Not yet implemented"
-                  variant="outline"
-                  className="h-11 rounded-2xl px-5 text-xs font-semibold uppercase tracking-[0.16em]"
-                >
-                  Save draft
                 </Button>
               </div>
             </CardContent>

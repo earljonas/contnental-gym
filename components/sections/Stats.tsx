@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 
 const stats = [
   { value: "1,200+", label: "Active Members", highlight: true },

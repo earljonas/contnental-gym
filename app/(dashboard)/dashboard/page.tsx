@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { MemberHome } from "@/components/member/member-home";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -6,72 +7,119 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // ── Profile ──
   const { data: profile } = await supabase
     .from("profiles")
     .select("first_name, last_name")
     .eq("id", user!.id)
     .single();
 
-  const { data: membership } = await supabase
+  type MembershipWithPlan = {
+    status: string;
+    start_date: string | null;
+    end_date: string | null;
+    plan_id: number;
+    membership_plans: { name: string; price: number } | null;
+  };
+
+  // ── Latest membership with end_date ──
+  const { data: membershipData } = await supabase
     .from("memberships")
-    .select("status, plan_id, membership_plans(name, price)")
+    .select("status, start_date, end_date, plan_id, membership_plans(name, price)")
     .eq("user_id", user!.id)
     .order("created_at", { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
+
+  const membership = membershipData as MembershipWithPlan | null;
+
+  // ── This week's attendance (Mon–Sun) ──
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() + mondayOffset);
+  weekStart.setHours(0, 0, 0, 0);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+  weekEnd.setHours(23, 59, 59, 999);
+
+  const { data: weekAttendance } = await supabase
+    .from("attendance")
+    .select("id, check_in_time")
+    .eq("user_id", user!.id)
+    .gte("check_in_time", weekStart.toISOString())
+    .lte("check_in_time", weekEnd.toISOString())
+    .order("check_in_time", { ascending: true });
+
+  // ── Streak: count consecutive days with check-ins going backwards from today ──
+  const { data: recentAttendance } = await supabase
+    .from("attendance")
+    .select("check_in_time")
+    .eq("user_id", user!.id)
+    .order("check_in_time", { ascending: false })
+    .limit(90);
+
+  // Build a set of unique dates (YYYY-MM-DD) for streak calculation
+  const attendanceDates = new Set(
+    (recentAttendance ?? []).map((a) =>
+      new Date(a.check_in_time).toISOString().split("T")[0]
+    )
+  );
+
+  let streak = 0;
+  const cursor = new Date();
+  // If the user hasn't checked in today, start from yesterday
+  const todayStr = cursor.toISOString().split("T")[0];
+  if (!attendanceDates.has(todayStr)) {
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  for (let i = 0; i < 90; i++) {
+    const dateStr = cursor.toISOString().split("T")[0];
+    if (attendanceDates.has(dateStr)) {
+      streak++;
+      cursor.setDate(cursor.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+
+  // ── Build week days array ──
+  const weekDays: { date: string; dayLabel: string; hasWorkout: boolean }[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(weekStart);
+    d.setDate(weekStart.getDate() + i);
+    const dateStr = d.toISOString().split("T")[0];
+    const dayLabel = d.toLocaleDateString("en-US", { weekday: "short" });
+    const hasWorkout = (weekAttendance ?? []).some(
+      (a) => new Date(a.check_in_time).toISOString().split("T")[0] === dateStr
+    );
+    weekDays.push({ date: dateStr, dayLabel, hasWorkout });
+  }
+
+  const sessionsThisWeek = weekDays.filter((d) => d.hasWorkout).length;
+
+  // ── Membership status info ──
+  const plan = membership?.membership_plans;
+
+  let daysLeft: number | null = null;
+  if (membership?.end_date) {
+    const end = new Date(membership.end_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    daysLeft = Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      {/* Welcome */}
-      <div className="mb-8">
-        <h1 className="font-display text-3xl font-black uppercase tracking-tight text-white sm:text-4xl">
-          Customer Page
-        </h1>
-        <p className="mt-2 text-[15px] text-text-secondary">
-          Welcome back, {profile?.first_name} {profile?.last_name}
-        </p>
-      </div>
-
-      {/* Membership status card */}
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="border border-border-subtle bg-surface p-6">
-          <h3 className="mb-1 text-[11px] font-medium uppercase tracking-[0.15em] text-text-secondary">
-            MEMBERSHIP STATUS
-          </h3>
-          <div className="mt-3 flex items-center gap-2">
-            <div
-              className={`h-2 w-2 rounded-full ${
-                membership?.status === "ACTIVE"
-                  ? "bg-green-500"
-                  : "bg-yellow-500"
-              }`}
-            />
-            <span className="text-[14px] font-medium uppercase tracking-wider text-white">
-              {membership?.status || "No membership"}
-            </span>
-          </div>
-        </div>
-
-        <div className="border border-border-subtle bg-surface p-6">
-          <h3 className="mb-1 text-[11px] font-medium uppercase tracking-[0.15em] text-text-secondary">
-            CURRENT PLAN
-          </h3>
-          <p className="mt-3 font-display text-xl font-black uppercase text-gold">
-            {(membership?.membership_plans as unknown as Record<string, string>)?.name || "—"}
-          </p>
-        </div>
-
-        <div className="border border-border-subtle bg-surface p-6">
-          <h3 className="mb-1 text-[11px] font-medium uppercase tracking-[0.15em] text-text-secondary">
-            MONTHLY RATE
-          </h3>
-          <p className="mt-3 font-display text-xl font-black text-white">
-            {(membership?.membership_plans as unknown as Record<string, number>)?.price
-              ? `₱${Number((membership?.membership_plans as unknown as Record<string, number>).price).toLocaleString()}`
-              : "—"}
-          </p>
-        </div>
-      </div>
-    </div>
+    <MemberHome
+      firstName={profile?.first_name ?? "Member"}
+      membershipStatus={membership?.status ?? null}
+      planName={plan?.name ?? null}
+      daysLeft={daysLeft}
+      sessionsThisWeek={sessionsThisWeek}
+      weeklyGoal={5}
+      weekDays={weekDays}
+      streak={streak}
+    />
   );
 }
