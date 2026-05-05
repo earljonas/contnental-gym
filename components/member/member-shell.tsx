@@ -31,11 +31,17 @@ export function MemberShell({
   membershipStatus,
 }: MemberShellProps) {
   const pathname = usePathname();
+  const isSessionPage = pathname.startsWith("/dashboard/session");
 
   const isActive = (href: string) => {
     if (href === "/dashboard") return pathname === "/dashboard";
     return pathname.startsWith(href);
   };
+
+  // Hide shell during active session for distraction-free workout
+  if (isSessionPage) {
+    return <div className="min-h-screen bg-background">{children}</div>;
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -100,18 +106,8 @@ export function MemberShell({
       {/* ── Main Content ── */}
       <main className="min-h-screen pb-20 md:ml-64 md:pb-0">
         <div className="mx-auto max-w-2xl px-4 py-6 md:max-w-4xl md:px-8 md:py-8">
-          {/* Membership status banners */}
-          {membershipStatus === "PENDING" && (
-            <div className="mb-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-600">
-              Your membership is pending activation. Visit any Contnental branch
-              to complete registration and payment.
-            </div>
-          )}
-          {membershipStatus === "EXPIRED" && (
-            <div className="mb-6 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-500">
-              Your membership has expired. Visit your branch to renew.
-            </div>
-          )}
+          {/* Membership status banners removed from shell - now handled in page content */}
+
 
           {children}
         </div>

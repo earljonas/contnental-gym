@@ -69,7 +69,7 @@ function ActivityRing({
       <svg
         width={size}
         height={size}
-        viewBox={`0 0 ${size} ${size}`}
+        viewBox={"0 0 " + size + " " + size}
         className="-rotate-90"
       >
         {/* Track */}
@@ -80,7 +80,7 @@ function ActivityRing({
           fill="none"
           stroke="currentColor"
           strokeWidth={strokeWidth}
-          className="text-muted/50"
+          className="text-muted-foreground/20"
         />
         {/* Progress */}
         <circle
@@ -239,7 +239,62 @@ export function MemberHome({
         </div>
       )}
 
-      {/* ═══ MIDDLE: Today's Focus Card ═══ */}
+      {/* ═══ Membership Info Strip (Active) ═══ */}
+      {planName && membershipStatus === "ACTIVE" && (
+        <Link
+          href="/dashboard/profile"
+          className="flex items-center justify-between rounded-2xl border border-border bg-card px-5 py-4 transition-all hover:bg-muted"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#C9973E]/10">
+              <CalendarCheck className="size-4 text-[#C9973E]" />
+            </div>
+            <div>
+              <p className="text-[13px] font-medium text-foreground">
+                {planName} Plan
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                {daysLeft !== null
+                  ? `${daysLeft} days remaining`
+                  : "Active membership"}
+              </p>
+            </div>
+          </div>
+          <ChevronRight className="size-4 text-muted-foreground" />
+        </Link>
+      )}
+
+      {/* ═══ Quick Action Row ═══ */}
+      <div className="grid grid-cols-3 gap-3">
+        <Link href="/dashboard/session" className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card px-4 py-5 transition-all hover:bg-muted active:scale-[0.97]">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#C9973E]/10">
+            <ClipboardList className="size-5 text-[#C9973E]" />
+          </div>
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground">
+            Log Workout
+          </span>
+        </Link>
+
+        <button className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card px-4 py-5 transition-all hover:bg-muted active:scale-[0.97]">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#C9973E]/10">
+            <QrCode className="size-5 text-[#C9973E]" />
+          </div>
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground">
+            My QR
+          </span>
+        </button>
+
+        <button className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card px-4 py-5 transition-all hover:bg-muted active:scale-[0.97]">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#C9973E]/10">
+            <Sparkles className="size-5 text-[#C9973E]" />
+          </div>
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground">
+            AI Coach
+          </span>
+        </button>
+      </div>
+
+      {/* ═══ Today's Focus Card ═══ */}
       <div className="overflow-hidden rounded-2xl border border-border bg-card">
         <div className="border-b border-border px-5 py-3">
           <span className="text-[11px] font-medium uppercase tracking-[0.15em] text-muted-foreground">
@@ -248,12 +303,11 @@ export function MemberHome({
         </div>
 
         <div className="px-5 py-6">
-          {/* No routines yet — show CTA */}
           <div className="flex flex-col items-center text-center">
             <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#C9973E]/10">
               <Dumbbell className="size-7 text-[#C9973E]" />
             </div>
-            <p className="font-display text-lg font-bold uppercase tracking-tight text-foreground">
+            <p className="font-display text-lg font-black uppercase tracking-tight text-foreground">
               No session planned
             </p>
             <p className="mt-1 max-w-xs text-[13px] text-muted-foreground">
@@ -261,20 +315,20 @@ export function MemberHome({
               plan here.
             </p>
             <div className="mt-5 flex gap-3">
-              <button className="flex items-center gap-2 rounded-xl bg-[#C9973E] px-5 py-3 text-[12px] font-semibold uppercase tracking-wider text-black transition-all hover:bg-[#B8882F] active:scale-[0.98]">
+              <Link href="/dashboard/session" className="flex items-center gap-2 rounded-xl bg-[#C9973E] px-5 py-3 text-[12px] font-semibold uppercase tracking-wider text-black transition-all hover:bg-[#B8882F] active:scale-[0.98]">
                 <Play className="size-4" />
                 Start Session
-              </button>
-              <button className="flex items-center gap-2 rounded-xl border border-border px-5 py-3 text-[12px] font-semibold uppercase tracking-wider text-foreground transition-all hover:bg-muted active:scale-[0.98]">
+              </Link>
+              <Link href="/dashboard/workouts" className="flex items-center gap-2 rounded-xl border border-border px-5 py-3 text-[12px] font-semibold uppercase tracking-wider text-foreground transition-all hover:bg-muted active:scale-[0.98]">
                 <ClipboardList className="size-4" />
                 Build Routine
-              </button>
+              </Link>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ═══ BOTTOM: Activity Ring + Weekly Strip ═══ */}
+      {/* ═══ Weekly Activity ═══ */}
       <div className="overflow-hidden rounded-2xl border border-border bg-card">
         <div className="border-b border-border px-5 py-3">
           <div className="flex items-center justify-between">
@@ -376,60 +430,19 @@ export function MemberHome({
         </div>
       </div>
 
-      {/* ═══ Quick Action Row ═══ */}
-      <div className="grid grid-cols-3 gap-3">
-        <button className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card px-4 py-5 transition-all hover:bg-muted active:scale-[0.97]">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#C9973E]/10">
-            <ClipboardList className="size-5 text-[#C9973E]" />
-          </div>
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground">
-            Log Workout
+      {/* ═══ Recent Sessions ═══ */}
+      <div className="overflow-hidden rounded-2xl border border-border bg-card">
+        <div className="border-b border-border px-5 py-3">
+          <span className="text-[11px] font-medium uppercase tracking-[0.15em] text-muted-foreground">
+            Recent Sessions
           </span>
-        </button>
-
-        <button className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card px-4 py-5 transition-all hover:bg-muted active:scale-[0.97]">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#C9973E]/10">
-            <QrCode className="size-5 text-[#C9973E]" />
-          </div>
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground">
-            My QR
-          </span>
-        </button>
-
-        <button className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card px-4 py-5 transition-all hover:bg-muted active:scale-[0.97]">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#C9973E]/10">
-            <Sparkles className="size-5 text-[#C9973E]" />
-          </div>
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground">
-            AI Coach
-          </span>
-        </button>
+        </div>
+        <div className="px-5 py-8 flex flex-col items-center justify-center text-center">
+          <p className="text-[13px] text-muted-foreground">
+            No sessions logged yet. Tap + to log your first workout.
+          </p>
+        </div>
       </div>
-
-      {/* ═══ Membership Info Strip ═══ */}
-      {planName && membershipStatus === "ACTIVE" && (
-        <Link
-          href="/dashboard/profile"
-          className="flex items-center justify-between rounded-2xl border border-border bg-card px-5 py-4 transition-all hover:bg-muted"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#C9973E]/10">
-              <CalendarCheck className="size-4 text-[#C9973E]" />
-            </div>
-            <div>
-              <p className="text-[13px] font-medium text-foreground">
-                {planName} Plan
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                {daysLeft !== null
-                  ? `${daysLeft} days remaining`
-                  : "Active membership"}
-              </p>
-            </div>
-          </div>
-          <ChevronRight className="size-4 text-muted-foreground" />
-        </Link>
-      )}
     </div>
   );
 }
