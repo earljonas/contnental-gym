@@ -275,14 +275,14 @@ export function MemberHome({
           </span>
         </Link>
 
-        <button className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card px-4 py-5 transition-all hover:bg-muted active:scale-[0.97]">
+        <Link href="/dashboard/checkin" className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card px-4 py-5 transition-all hover:bg-muted active:scale-[0.97]">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#C9973E]/10">
             <QrCode className="size-5 text-[#C9973E]" />
           </div>
           <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground">
             My QR
           </span>
-        </button>
+        </Link>
 
         <button className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card px-4 py-5 transition-all hover:bg-muted active:scale-[0.97]">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#C9973E]/10">

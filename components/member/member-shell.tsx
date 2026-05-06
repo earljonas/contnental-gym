@@ -9,6 +9,7 @@ import {
   UserRound,
   Plus,
   LogOut,
+  QrCode,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -151,10 +152,10 @@ export function MemberShell({
           </span>
         </Link>
 
-        {/* Center [+] button */}
-        <button className="flex h-14 w-14 -translate-y-3 items-center justify-center rounded-full bg-[#C9973E] text-black shadow-lg shadow-[#C9973E]/30 transition-transform active:scale-95">
+        {/* Center quick-log button */}
+        <Link href="/dashboard/session" className="flex h-14 w-14 -translate-y-3 items-center justify-center rounded-full bg-[#C9973E] text-black shadow-lg shadow-[#C9973E]/30 transition-transform active:scale-95">
           <Plus className="size-6" />
-        </button>
+        </Link>
 
         {/* Progress */}
         <Link href="/dashboard/progress" className="flex flex-col items-center gap-1">

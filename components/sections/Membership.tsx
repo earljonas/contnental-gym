@@ -3,11 +3,11 @@
 import { motion } from "motion/react";
 
 const plans = [
-  { name: "Day Pass", duration: "Single Entry", price: 200, tag: "Drop-in" },
-  { name: "1 Month", duration: "30 Days", price: 1000, tag: null },
-  { name: "3 Months", duration: "90 Days", price: 2700, tag: null },
-  { name: "6 Months", duration: "180 Days", price: 5100, tag: "Popular" },
-  { name: "12 Months", duration: "365 Days", price: 9600, tag: "Best Value" },
+  { name: "Day Pass", price: 200, tag: "Drop-in" },
+  { name: "1 Month", price: 1000, tag: null },
+  { name: "3 Months", price: 2700, tag: null },
+  { name: "6 Months", price: 5100, tag: "Popular" },
+  { name: "12 Months", price: 9600, tag: "Best Value" },
 ];
 
 export function Membership() {
@@ -72,9 +72,6 @@ export function Membership() {
                     </h3>
                     
                     <div className="flex items-center gap-4 transition-transform duration-500 ease-out group-hover:translate-x-4">
-                      <span className="text-[11px] text-white/40 uppercase tracking-[0.2em] font-medium">
-                        {plan.duration}
-                      </span>
                       {plan.tag && (
                         <span className={`text-[9px] font-bold uppercase tracking-[0.2em] px-2 py-0.5 ${
                           plan.tag === 'Best Value' 
