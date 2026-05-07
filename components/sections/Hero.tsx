@@ -47,7 +47,7 @@ export function Hero() {
             fontSize: "clamp(72px, 10vw, 140px)",
           }}
         >
-          TRAIN HERE
+          TRAIN WITH US
         </motion.h1>
 
         {/* Subline */}

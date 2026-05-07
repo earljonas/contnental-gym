@@ -23,46 +23,40 @@ interface FormData {
 /* ─── PLANS ─── */
 const plans = [
   {
-    id: "basic",
-    name: "BASIC",
-    price: "₱1,500",
-    period: "/month",
+    id: "1-month",
+    name: "1 Month",
+    price: "₱1,000",
+    duration: "30 days",
     dbId: 1,
-    features: [
-      "Full gym floor access",
-      "Locker room and showers",
-      "Open daily 6AM – 10PM",
-      "Equipment walkthrough on signup",
-    ],
+    popular: false,
+    bestValue: false,
   },
   {
-    id: "elite",
-    name: "ELITE",
-    price: "₱2,500",
-    period: "/month",
+    id: "3-months",
+    name: "3 Months",
+    price: "₱2,700",
+    duration: "90 days",
     dbId: 2,
-    popular: true,
-    features: [
-      "Everything in Basic",
-      "Group training sessions",
-      "Coached technique clinics",
-      "Priority equipment booking",
-      "1 guest pass per month",
-    ],
+    popular: false,
+    bestValue: false,
   },
   {
-    id: "premium",
-    name: "PREMIUM",
-    price: "₱4,000",
-    period: "/month",
+    id: "6-months",
+    name: "6 Months",
+    price: "₱5,100",
+    duration: "180 days",
     dbId: 3,
-    features: [
-      "Everything in Elite",
-      "Monthly personal programming",
-      "Body composition check-ins",
-      "24/7 facility access",
-      "Recovery area access",
-    ],
+    popular: true,
+    bestValue: false,
+  },
+  {
+    id: "12-months",
+    name: "12 Months",
+    price: "₱9,600",
+    duration: "365 days",
+    dbId: 4,
+    popular: false,
+    bestValue: true,
   },
 ];
 
@@ -191,9 +185,15 @@ export default function RegisterPage() {
     if (user) {
       const selectedPlan = plans.find((p) => p.id === form.plan);
       if (selectedPlan) {
+        const { data: livePlan } = await supabase
+          .from("membership_plans")
+          .select("id")
+          .eq("name", selectedPlan.name)
+          .maybeSingle();
+
         await supabase.from("memberships").insert({
           user_id: user.id,
-          plan_id: selectedPlan.dbId,
+          plan_id: livePlan?.id ?? selectedPlan.dbId,
           status: "PENDING",
         });
       }
@@ -317,28 +317,19 @@ export default function RegisterPage() {
                   <button key={plan.id} type="button" onClick={() => { setForm((p) => ({ ...p, plan: plan.id })); setErrors({}); }}
                     className={`relative w-full border p-5 text-left transition-all ${form.plan === plan.id ? "border-white bg-white/5" : "border-border-subtle bg-surface hover:border-white/30"}`}>
                     {plan.popular && <span className="absolute -top-2.5 right-4 bg-white px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-black">POPULAR</span>}
+                    {plan.bestValue && <span className="absolute -top-2.5 right-4 bg-gold px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-black">BEST VALUE</span>}
                     <div className="flex items-center justify-between">
                       <div>
                         <h3 className="font-display text-lg font-black uppercase tracking-tight text-white">{plan.name}</h3>
                         <div className="mt-1 flex items-baseline gap-1">
                           <span className="font-display text-2xl font-black text-white">{plan.price}</span>
-                          <span className="text-[12px] text-text-secondary">{plan.period}</span>
+                          <span className="text-[12px] text-text-secondary">{plan.duration}</span>
                         </div>
                       </div>
                       <div className={`flex h-5 w-5 items-center justify-center rounded-full border-2 transition-colors ${form.plan === plan.id ? "border-white bg-white" : "border-border-subtle"}`}>
                         {form.plan === plan.id && <div className="h-2 w-2 rounded-full bg-black" />}
                       </div>
                     </div>
-                    {form.plan === plan.id && (
-                      <motion.ul initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} transition={{ duration: 0.2 }} className="mt-4 space-y-2 border-t border-border-subtle pt-4">
-                        {plan.features.map((f) => (
-                          <li key={f} className="flex items-center gap-2 text-[13px] text-text-secondary">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C6A75E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 7"/></svg>
-                            {f}
-                          </li>
-                        ))}
-                      </motion.ul>
-                    )}
                   </button>
                 ))}
               </div>
@@ -406,7 +397,7 @@ export default function RegisterPage() {
                   <div className="flex justify-between"><span className="text-text-secondary">Phone</span><span className="text-white">{form.phone}</span></div>
                   <div className="h-px bg-border-subtle" />
                   <div className="flex justify-between"><span className="text-text-secondary">Plan</span><span className="font-medium uppercase text-gold">{plans.find((p) => p.id === form.plan)?.name}</span></div>
-                  <div className="flex justify-between"><span className="text-text-secondary">Price</span><span className="text-white">{plans.find((p) => p.id === form.plan)?.price}{plans.find((p) => p.id === form.plan)?.period}</span></div>
+                  <div className="flex justify-between"><span className="text-text-secondary">Price</span><span className="text-white">{plans.find((p) => p.id === form.plan)?.price}</span></div>
                   <div className="flex justify-between"><span className="text-text-secondary">Status</span><span className="text-[12px] uppercase tracking-wider text-yellow-500">Pending Activation</span></div>
                 </div>
               </div>
