@@ -38,7 +38,7 @@ export type MemberRow = {
 
 export type PlanRow = {
   name: string;
-  tier: "Basic" | "Prime" | "Extreme";
+  tier: string;
   price: string;
   duration: string;
   access: string;
@@ -119,16 +119,17 @@ const fallbackData: OverviewData = {
     { label: "Sun", value: 198 },
   ],
   planDistribution: [
-    { label: "Basic", value: 432 },
-    { label: "Prime", value: 511 },
-    { label: "Extreme", value: 305 },
+    { label: "1 Month", value: 432 },
+    { label: "3 Months", value: 311 },
+    { label: "6 Months", value: 289 },
+    { label: "12 Months", value: 216 },
   ],
   recentActivity: [
     {
       member: "Mikaela Santos",
       branch: "Ecoland",
-      activity: "Membership upgraded to Extreme",
-      amount: "PHP 4,000",
+      activity: "Membership upgraded to 12 Months",
+      amount: "PHP 9,600",
       timestamp: "10 min ago",
       status: "success",
     },
@@ -136,7 +137,7 @@ const fallbackData: OverviewData = {
       member: "Jerome Cruz",
       branch: "Lanang",
       activity: "Payment awaiting confirmation",
-      amount: "PHP 2,500",
+      amount: "PHP 2,700",
       timestamp: "23 min ago",
       status: "warning",
     },
@@ -161,7 +162,7 @@ const fallbackData: OverviewData = {
       name: "Mikaela Santos",
       email: "mikaela@contnental.fit",
       branch: "Ecoland",
-      plan: "Extreme",
+      plan: "12 Months",
       status: "Active",
       joined: "Apr 12, 2026",
     },
@@ -170,7 +171,7 @@ const fallbackData: OverviewData = {
       name: "Jerome Cruz",
       email: "jerome@contnental.fit",
       branch: "Lanang",
-      plan: "Prime",
+      plan: "3 Months",
       status: "Pending",
       joined: "Apr 10, 2026",
     },
@@ -179,7 +180,7 @@ const fallbackData: OverviewData = {
       name: "Alyssa Tan",
       email: "alyssa@contnental.fit",
       branch: "Torres",
-      plan: "Basic",
+      plan: "1 Month",
       status: "At Risk",
       joined: "Mar 18, 2026",
     },
@@ -188,34 +189,42 @@ const fallbackData: OverviewData = {
       name: "Noah Reyes",
       email: "noah@contnental.fit",
       branch: "Ecoland",
-      plan: "Prime",
+      plan: "6 Months",
       status: "Active",
       joined: "Mar 06, 2026",
     },
   ],
   plans: [
     {
-      name: "Starter Access",
-      tier: "Basic",
-      price: "PHP 1,500",
+      name: "1 Month",
+      tier: "Access",
+      price: "PHP 1,000",
       duration: "30 days",
-      access: "Floor access, locker room",
+      access: "Standard gym access",
       status: "Active",
     },
     {
-      name: "Performance Prime",
-      tier: "Prime",
-      price: "PHP 2,500",
-      duration: "30 days",
-      access: "Classes, floor access, guest pass",
+      name: "3 Months",
+      tier: "Access",
+      price: "PHP 2,700",
+      duration: "90 days",
+      access: "Standard gym access",
       status: "Active",
     },
     {
-      name: "Extreme Plus",
-      tier: "Extreme",
-      price: "PHP 4,000",
-      duration: "30 days",
-      access: "24/7 access, recovery, coaching",
+      name: "6 Months",
+      tier: "Access",
+      price: "PHP 5,100",
+      duration: "180 days",
+      access: "Standard gym access",
+      status: "Active",
+    },
+    {
+      name: "12 Months",
+      tier: "Access",
+      price: "PHP 9,600",
+      duration: "365 days",
+      access: "Standard gym access",
       status: "Active",
     },
   ],
@@ -224,7 +233,7 @@ const fallbackData: OverviewData = {
       id: 1,
       member: "Jerome Cruz",
       branch: "Lanang",
-      amount: "PHP 2,500",
+      amount: "PHP 2,700",
       method: "GCash",
       dueDate: "Apr 18, 2026",
       status: "Pending",
@@ -233,7 +242,7 @@ const fallbackData: OverviewData = {
       id: 2,
       member: "Mikaela Santos",
       branch: "Ecoland",
-      amount: "PHP 4,000",
+      amount: "PHP 9,600",
       method: "Cash",
       dueDate: "Apr 17, 2026",
       status: "Confirmed",
@@ -242,7 +251,7 @@ const fallbackData: OverviewData = {
       id: 3,
       member: "Rica Flores",
       branch: "Torres",
-      amount: "PHP 1,500",
+      amount: "PHP 1,000",
       method: "GCash",
       dueDate: "Apr 14, 2026",
       status: "Overdue",
@@ -286,15 +295,15 @@ const fallbackData: OverviewData = {
       publishAt: "Apr 15, 2026",
     },
     {
-      title: "Prime plan class refresh",
-      audience: "Prime members",
+      title: "3 Month plan refresh",
+      audience: "3 Month members",
       channel: "Email",
       status: "Scheduled",
       publishAt: "Apr 19, 2026",
     },
     {
       title: "New recovery area opening",
-      audience: "Extreme members",
+      audience: "12 Month members",
       channel: "Portal",
       status: "Draft",
       publishAt: "TBD",
@@ -329,6 +338,7 @@ export async function getSuperAdminOverview(): Promise<OverviewData> {
       plansResult,
       paymentsResult,
       attendanceResult,
+      todayAttendanceCountResult,
       branchesResult,
     ] = await Promise.all([
       supabase
@@ -343,13 +353,18 @@ export async function getSuperAdminOverview(): Promise<OverviewData> {
         .select("id, name, price, duration, is_active"),
       supabase
         .from("payments")
-        .select("id, user_id, amount, payment_method, status, created_at")
+        .select("id, user_id, branch_id, amount, payment_method, status, created_at, branches(name)")
         .order("created_at", { ascending: false }),
       supabase
         .from("attendance")
         .select("id, user_id, branch_id, check_in_time, branches(name)")
         .order("check_in_time", { ascending: false })
         .limit(20),
+      supabase
+        .from("attendance")
+        .select("id", { count: "exact", head: true })
+        .gte("check_in_time", new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
+        .lte("check_in_time", new Date(new Date().setHours(23, 59, 59, 999)).toISOString()),
       supabase.from("branches").select("id, name"),
     ]);
 
@@ -359,6 +374,7 @@ export async function getSuperAdminOverview(): Promise<OverviewData> {
       plansResult.error ||
       paymentsResult.error ||
       attendanceResult.error ||
+      todayAttendanceCountResult.error ||
       branchesResult.error
     ) {
       if (profilesResult.error) console.error("[getSuperAdminOverview] profiles query failed:", profilesResult.error);
@@ -366,6 +382,7 @@ export async function getSuperAdminOverview(): Promise<OverviewData> {
       if (plansResult.error) console.error("[getSuperAdminOverview] plans query failed:", plansResult.error);
       if (paymentsResult.error) console.error("[getSuperAdminOverview] payments query failed:", paymentsResult.error);
       if (attendanceResult.error) console.error("[getSuperAdminOverview] attendance query failed:", attendanceResult.error);
+      if (todayAttendanceCountResult.error) console.error("[getSuperAdminOverview] today attendance count query failed:", todayAttendanceCountResult.error);
       if (branchesResult.error) console.error("[getSuperAdminOverview] branches query failed:", branchesResult.error);
       return fallbackData;
     }
@@ -378,12 +395,15 @@ export async function getSuperAdminOverview(): Promise<OverviewData> {
     const branches = branchesResult.data ?? [];
 
     const members = profiles.filter((profile) => profile.role === "MEMBER");
-    const activeMembers = memberships.filter((membership) => membership.status === "ACTIVE");
+    const activeMemberIds = new Set(memberships.filter((membership) => membership.status === "ACTIVE").map((membership) => membership.user_id));
     const overduePayments = payments.filter(
       (payment) => payment.status === "PENDING" && isOverdue(payment.created_at)
     );
-    const revenue = payments
-      .filter((payment) => payment.status === "CONFIRMED")
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+    const monthlyRevenue = payments
+      .filter((payment) => payment.status === "CONFIRMED" && new Date(payment.created_at) >= monthStart)
       .reduce((total, payment) => total + Number(payment.amount ?? 0), 0);
 
     const branchNameById = new Map<number, string>(branches.map((branch) => [branch.id, branch.name]));
@@ -399,7 +419,7 @@ export async function getSuperAdminOverview(): Promise<OverviewData> {
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
 
-    const liveMembers: MemberRow[] = sortedMembers.slice(0, 6).map((member) => {
+    const liveMembers: MemberRow[] = sortedMembers.map((member) => {
       const latestMembership = latestMembershipByUser.get(member.id);
       const relatedBranch = Array.isArray(member.branches) ? member.branches[0] : member.branches;
 
@@ -429,7 +449,7 @@ export async function getSuperAdminOverview(): Promise<OverviewData> {
       value,
     }));
 
-    const liveAttendance = attendance.slice(0, 6).map((item) => {
+    const liveAttendance = attendance.map((item) => {
       const member = profiles.find((profile) => profile.id === item.user_id);
       const branch = Array.isArray(item.branches) ? item.branches[0] : item.branches;
       const date = new Date(item.check_in_time);
@@ -451,12 +471,13 @@ export async function getSuperAdminOverview(): Promise<OverviewData> {
 
     const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
 
-    const livePayments: PaymentRow[] = payments.slice(0, 6).map((payment) => {
+    const livePayments: PaymentRow[] = payments.map((payment) => {
       const member = profileById.get(payment.user_id);
+      const collectionBranch = Array.isArray(payment.branches) ? payment.branches[0] : payment.branches;
       return {
         id: payment.id,
         member: member ? `${member.first_name} ${member.last_name}` : "Member",
-        branch: branchNameById.get(member?.branch_id ?? -1) ?? "Unknown Branch",
+        branch: collectionBranch?.name ?? branchNameById.get(payment.branch_id ?? -1) ?? "Unassigned",
         amount: formatCurrency(Number(payment.amount ?? 0)),
         method: payment.payment_method ?? "Unknown",
         dueDate: new Date(payment.created_at).toLocaleDateString("en-US", {
@@ -478,19 +499,19 @@ export async function getSuperAdminOverview(): Promise<OverviewData> {
       metrics: [
         {
           label: "Active members",
-          value: activeMembers.length.toLocaleString(),
-          delta: `${members.length ? Math.round((activeMembers.length / members.length) * 100) : 0}% active`,
+          value: activeMemberIds.size.toLocaleString(),
+          delta: `${members.length ? Math.round((activeMemberIds.size / members.length) * 100) : 0}% active`,
           trend: "up",
         },
         {
           label: "Monthly revenue",
-          value: formatCurrency(revenue || 0),
+          value: formatCurrency(monthlyRevenue || 0),
           delta: `${payments.filter((payment) => payment.status === "CONFIRMED").length} confirmed payments`,
           trend: "up",
         },
         {
           label: "Daily check-ins",
-          value: attendance.length.toLocaleString(),
+          value: (todayAttendanceCountResult.count ?? 0).toLocaleString(),
           delta: `${branches.length || 1} branches reporting`,
           trend: "up",
         },
@@ -508,12 +529,7 @@ export async function getSuperAdminOverview(): Promise<OverviewData> {
         plans.length > 0
           ? plans.map((plan) => ({
               name: plan.name,
-              tier:
-                plan.name.toLowerCase().includes("basic")
-                  ? "Basic"
-                  : plan.name.toLowerCase().includes("prime")
-                    ? "Prime"
-                    : "Extreme",
+              tier: "Access",
               price: formatCurrency(Number(plan.price)),
               duration: `${plan.duration} days`,
               access: "Managed access controls",

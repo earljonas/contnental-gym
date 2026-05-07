@@ -50,7 +50,7 @@ export function searchExercises(
     );
   }
 
-  return filtered.slice(0, 30);
+  return filtered;
 }
 
 export function getBodyParts(exercises: Exercise[]): string[] {

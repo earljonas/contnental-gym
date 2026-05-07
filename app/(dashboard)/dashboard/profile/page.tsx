@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { ProfilePage } from "@/components/member/profile-page";
+import { pickCurrentMembership } from "@/lib/member-membership";
 
 export default async function ProfileRoute() {
   const supabase = await createClient();
@@ -14,14 +15,15 @@ export default async function ProfileRoute() {
     .eq("id", user!.id)
     .single();
 
-  // Membership with plan
-  const { data: membership } = await supabase
+  // Current membership with plan
+  const { data: memberships } = await supabase
     .from("memberships")
-    .select("status, start_date, end_date, plan_id, membership_plans(name, duration)")
+    .select("status, start_date, end_date, created_at, plan_id, membership_plans(name, duration)")
     .eq("user_id", user!.id)
     .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(10);
+
+  const membership = pickCurrentMembership(memberships ?? []);
 
   // Payments
   const { data: payments } = await supabase

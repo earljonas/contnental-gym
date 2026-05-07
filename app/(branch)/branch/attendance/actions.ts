@@ -26,13 +26,32 @@ export async function checkInMember(
     const member = await lookupMemberForCheckIn(memberId);
     if (!member) return { error: "Member not found" };
 
-    if (member.branchId !== roleInfo.branch_id) {
-      return { error: "Member not assigned to this branch" };
-    }
-
     // Only allow check-in for active members
     if (member.membershipStatus !== "ACTIVE") {
       return { member, error: `Membership is ${member.membershipStatus}` };
+    }
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const { data: existingCheckIn, error: existingCheckInError } = await supabase
+      .from("attendance")
+      .select("id")
+      .eq("user_id", memberId)
+      .gte("check_in_time", todayStart.toISOString())
+      .lte("check_in_time", todayEnd.toISOString())
+      .limit(1)
+      .maybeSingle();
+
+    if (existingCheckInError) {
+      console.error("[checkInMember] duplicate check failed:", existingCheckInError);
+      return { error: "Failed to verify today's check-in" };
+    }
+
+    if (existingCheckIn) {
+      return { member, error: "Already checked in today" };
     }
 
     // Insert attendance record
@@ -74,10 +93,6 @@ export async function lookupMemberAction(
 
     const member = await lookupMemberForCheckIn(memberId);
     if (!member) return { error: "Member not found" };
-
-    if (member.branchId !== roleInfo.branch_id) {
-      return { error: "Member not assigned to this branch" };
-    }
 
     return { member };
   } catch {

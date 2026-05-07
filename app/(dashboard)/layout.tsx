@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getUserRole } from "@/lib/supabase/roles";
 import { MemberShell } from "@/components/member/member-shell";
+import { pickCurrentMembership } from "@/lib/member-membership";
 
 export default async function DashboardLayout({
   children,
@@ -27,14 +28,14 @@ export default async function DashboardLayout({
   if (roleInfo.role === "SUPER_ADMIN") redirect("/admin");
   if (roleInfo.role === "BRANCH_ADMIN") redirect("/branch");
 
-  // Get latest membership status
-  const { data: membership } = await supabase
+  const { data: memberships } = await supabase
     .from("memberships")
-    .select("status")
+    .select("status, created_at, end_date")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(10);
+
+  const membership = pickCurrentMembership(memberships ?? []);
 
   return (
     <MemberShell

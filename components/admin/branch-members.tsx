@@ -1,23 +1,37 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
-  Eye,
+  Activity,
+  CalendarDays,
+  CreditCard,
+  Edit3,
+  Mail,
+  Menu,
+  Phone,
+  Shield,
   UserCheck,
   UserPlus,
   Users,
-  Shield,
   Clock,
+  X,
   XCircle,
 } from "lucide-react";
 
+import { ActivateModal } from "@/app/(branch)/branch/activate-modal";
+import {
+  manualCheckInFromMembers,
+  updateBranchMemberProfile,
+} from "@/app/(branch)/branch/members/actions";
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { AdminPageTransition } from "@/components/admin/page-transition";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import {
   Table,
@@ -27,23 +41,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
 import type {
   BranchMembersData,
   MemberDetails,
-  MemberRow,
   PendingMember,
 } from "@/lib/branch-admin/data";
-import { manualCheckInFromMembers } from "@/app/(branch)/branch/members/actions";
-import { ActivateModal } from "@/app/(branch)/branch/activate-modal";
 
-// ── Status helpers ──
+type Tab = "members" | "walkups";
+type Feedback = { id: string; type: "success" | "error"; message: string } | null;
+type MemberRow = BranchMembersData["members"][number];
 
 function statusBadgeClass(status: string) {
   switch (status) {
@@ -59,194 +65,450 @@ function statusBadgeClass(status: string) {
   }
 }
 
-// ── Member Detail Sheet ──
+function formatDate(date: string | null | undefined) {
+  if (!date) return "Not set";
+  return new Date(date).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
-function BranchMemberSheet({
-  details,
-  onClose,
+function MemberActionsMenu({
+  member,
+  isPending,
+  feedback,
+  onEdit,
+  onCheckIn,
 }: {
-  details: MemberDetails;
-  onClose: () => void;
+  member: MemberRow;
+  isPending: boolean;
+  feedback: Feedback;
+  onEdit: () => void;
+  onCheckIn: () => void;
 }) {
-  const currentStatus = details.memberships[0]?.status ?? "NONE";
+  const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(event: MouseEvent) {
+      const target = event.target as Node;
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(target) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(target)
+      ) {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function closeMenu() {
+      setOpen(false);
+    }
+
+    window.addEventListener("scroll", closeMenu, true);
+    window.addEventListener("resize", closeMenu);
+    return () => {
+      window.removeEventListener("scroll", closeMenu, true);
+      window.removeEventListener("resize", closeMenu);
+    };
+  }, [open]);
+
+  function toggleMenu() {
+    const rect = buttonRef.current?.getBoundingClientRect();
+    if (rect) {
+      setPosition({
+        top: rect.bottom + 8,
+        left: Math.max(12, rect.right - 176),
+      });
+    }
+    setOpen((current) => !current);
+  }
 
   return (
-    <Sheet open onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="w-[420px] sm:w-[560px] overflow-y-auto bg-background/95 backdrop-blur-xl border-border">
-        <SheetHeader className="mb-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <SheetTitle className="text-2xl font-bold uppercase tracking-tight">
-                {details.profile.first_name} {details.profile.last_name}
-              </SheetTitle>
-              <SheetDescription className="text-muted-foreground mt-1 text-sm">
-                {details.profile.email}
-                {details.profile.phone ? ` · ${details.profile.phone}` : ""}
-              </SheetDescription>
-            </div>
-            <Badge
-              variant="secondary"
-              className={statusBadgeClass(currentStatus)}
-            >
-              {currentStatus}
-            </Badge>
-          </div>
-          {details.profile.avatar_url && (
-            <img
-              src={details.profile.avatar_url}
-              alt=""
-              className="mt-3 size-16 rounded-full border-2 border-border object-cover"
-            />
-          )}
-        </SheetHeader>
+    <div
+      className="relative flex justify-end"
+      onClick={(event) => event.stopPropagation()}
+    >
+      <Button
+        ref={buttonRef}
+        type="button"
+        variant="outline"
+        size="icon-sm"
+        className="rounded-xl"
+        onClick={toggleMenu}
+        aria-label={`Open actions for ${member.name}`}
+        aria-expanded={open}
+      >
+        <Menu className="size-4" />
+      </Button>
 
-        <div className="space-y-6">
-          {/* Profile Info */}
-          <div>
-            <h4 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3 border-b border-border pb-2">
-              Profile
-            </h4>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-lg bg-secondary/20 p-3">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                  Joined
-                </p>
-                <p className="mt-1 text-sm font-medium text-foreground">
-                  {new Date(details.profile.created_at).toLocaleDateString(
-                    "en-US",
-                    { month: "short", day: "numeric", year: "numeric" }
-                  )}
-                </p>
-              </div>
-              <div className="rounded-lg bg-secondary/20 p-3">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                  Total Check-ins
-                </p>
-                <p className="mt-1 text-sm font-medium text-foreground">
-                  {details.attendance.length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Membership History */}
-          <div>
-            <h4 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3 border-b border-border pb-2">
-              Membership History
-            </h4>
-            <div className="space-y-2">
-              {details.memberships.map((m) => (
-                <div
-                  key={m.id}
-                  className="flex items-center justify-between p-3 rounded-lg bg-secondary/20"
-                >
-                  <div>
-                    <span className="text-sm font-semibold text-foreground">
-                      {m.plan_name}
-                    </span>
-                    <p className="text-xs text-muted-foreground">
-                      {m.start_date
-                        ? new Date(m.start_date).toLocaleDateString()
-                        : new Date(m.created_at).toLocaleDateString()}{" "}
-                      —{" "}
-                      {m.end_date
-                        ? new Date(m.end_date).toLocaleDateString()
-                        : "Ongoing"}
-                    </p>
-                  </div>
-                  <Badge variant="outline" className={statusBadgeClass(m.status)}>
-                    {m.status}
-                  </Badge>
-                </div>
-              ))}
-              {details.memberships.length === 0 && (
-                <p className="text-sm text-muted-foreground">No records found.</p>
-              )}
-            </div>
-          </div>
-
-          {/* Payment History */}
-          <div>
-            <h4 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3 border-b border-border pb-2">
-              Recent Payments
-            </h4>
-            <div className="space-y-2">
-              {details.payments.map((p) => (
-                <div
-                  key={p.id}
-                  className="flex items-center justify-between p-3 rounded-lg bg-secondary/20"
-                >
-                  <div>
-                    <span className="text-sm font-semibold text-foreground">
-                      PHP {p.amount.toLocaleString()}
-                    </span>
-                    <p className="text-xs text-muted-foreground">
-                      via {p.payment_method} ·{" "}
-                      {new Date(p.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <Badge
-                    variant={p.status === "CONFIRMED" ? "secondary" : "outline"}
-                  >
-                    {p.status}
-                  </Badge>
-                </div>
-              ))}
-              {details.payments.length === 0 && (
-                <p className="text-sm text-muted-foreground">No records found.</p>
-              )}
-            </div>
-          </div>
-
-          {/* Attendance Log */}
-          <div>
-            <h4 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3 border-b border-border pb-2">
-              Attendance Log (This Branch)
-            </h4>
-            <div className="space-y-2">
-              {details.attendance.map((a) => (
-                <div
-                  key={a.id}
-                  className="flex items-center justify-between p-3 rounded-lg bg-secondary/20"
-                >
-                  <span className="text-sm text-foreground">
-                    {new Date(a.check_in_time).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                    })}
-                  </span>
-                  <span className="text-sm text-muted-foreground">
-                    {new Date(a.check_in_time).toLocaleTimeString("en-US", {
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })}
-                  </span>
-                </div>
-              ))}
-              {details.attendance.length === 0 && (
-                <p className="text-sm text-muted-foreground">No records found.</p>
-              )}
-            </div>
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
+      {open ? createPortal(
+        <div
+          ref={menuRef}
+          className="fixed z-[80] w-44 rounded-2xl border border-border bg-card p-1"
+          style={{ top: position.top, left: position.left }}
+        >
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-10 w-full justify-start rounded-xl px-3"
+            onClick={() => {
+              setOpen(false);
+              onEdit();
+            }}
+          >
+            <Edit3 className="size-4 text-muted-foreground" />
+            Edit
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-10 w-full justify-start rounded-xl px-3"
+            onClick={() => {
+              setOpen(false);
+              onCheckIn();
+            }}
+            disabled={isPending || member.status !== "ACTIVE"}
+          >
+            <UserCheck className="size-4 text-muted-foreground" />
+            {feedback?.id === member.id ? feedback.message : "Check in"}
+          </Button>
+        </div>,
+        document.body
+      ) : null}
+    </div>
   );
 }
 
-// ── Main Members Page ──
+function BranchMemberSheet({
+  details,
+  editMode,
+  onClose,
+}: {
+  details: MemberDetails;
+  editMode: boolean;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [editing, setEditing] = useState(editMode);
+  const [error, setError] = useState("");
+  const [firstName, setFirstName] = useState(details.profile.first_name);
+  const [lastName, setLastName] = useState(details.profile.last_name);
+  const [phone, setPhone] = useState(details.profile.phone ?? "");
+  const currentStatus = details.memberships[0]?.status ?? "NONE";
+  const currentMembership = details.memberships[0] ?? null;
+  const initials = `${details.profile.first_name[0] ?? ""}${details.profile.last_name[0] ?? ""}`.toUpperCase();
 
-type Tab = "members" | "walkups";
+  function handleSave() {
+    startTransition(async () => {
+      setError("");
+      const result = await updateBranchMemberProfile({
+        memberId: details.profile.id,
+        firstName,
+        lastName,
+        phone,
+      });
+
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+
+      setEditing(false);
+      router.replace(`/branch/members?memberId=${details.profile.id}`);
+      router.refresh();
+    });
+  }
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="member-detail-title"
+        className="relative flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-border bg-background"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-border bg-card p-6">
+          <div className="flex min-w-0 items-start gap-4">
+            <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-border bg-secondary text-xl font-black uppercase text-foreground">
+              {details.profile.avatar_url ? (
+                <span
+                  className="size-full bg-cover bg-center"
+                  style={{ backgroundImage: `url(${details.profile.avatar_url})` }}
+                  aria-hidden="true"
+                />
+              ) : (
+                initials
+              )}
+            </div>
+            <div className="min-w-0">
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <h2
+                  id="member-detail-title"
+                  className="font-display text-3xl font-black uppercase leading-none tracking-tight text-foreground md:text-4xl"
+                >
+                  {details.profile.first_name} {details.profile.last_name}
+                </h2>
+                <Badge variant="secondary" className={statusBadgeClass(currentStatus)}>
+                  {currentStatus}
+                </Badge>
+              </div>
+              <div className="flex flex-col gap-1 text-sm text-muted-foreground sm:flex-row sm:flex-wrap sm:gap-x-4">
+                <span className="flex items-center gap-2">
+                  <Mail className="size-4" />
+                  {details.profile.email}
+                </span>
+                <span className="flex items-center gap-2">
+                  <Phone className="size-4" />
+                  {details.profile.phone || "No phone number"}
+                </span>
+              </div>
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            className="rounded-xl"
+            onClick={onClose}
+            aria-label="Close member details"
+          >
+            <X className="size-4" />
+          </Button>
+        </div>
+
+        <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[320px_1fr]">
+          <aside className="space-y-4 border-b border-border bg-card/50 p-6 lg:border-b-0 lg:border-r">
+            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+              <div className="rounded-2xl border border-border bg-card p-4">
+                <CalendarDays className="mb-3 size-4 text-muted-foreground" />
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                  Joined
+                </p>
+                <p className="mt-1 text-sm font-bold text-foreground">{formatDate(details.profile.created_at)}</p>
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-4">
+                <Activity className="mb-3 size-4 text-muted-foreground" />
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                  Check-ins
+                </p>
+                <p className="mt-1 text-sm font-bold text-foreground">{details.attendance.length}</p>
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-4">
+                <Shield className="mb-3 size-4 text-muted-foreground" />
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                  Current Plan
+                </p>
+                <p className="mt-1 truncate text-sm font-bold text-foreground">
+                  {currentMembership?.plan_name ?? "No plan"}
+                </p>
+              </div>
+            </div>
+
+            {editing ? (
+              <div className="rounded-2xl border border-border bg-card p-5">
+                <div className="mb-5">
+                  <h3 className="font-display text-xl font-black uppercase tracking-tight text-foreground">
+                    Edit Profile
+                  </h3>
+                  <p className="text-xs text-muted-foreground">Name and contact number only</p>
+                </div>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="member-first-name" className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                      First name
+                    </Label>
+                    <Input
+                      id="member-first-name"
+                      value={firstName}
+                      onChange={(event) => setFirstName(event.target.value)}
+                      className="h-10 rounded-xl focus:border-[#C9973E] focus:ring-[#C9973E]/20"
+                      disabled={isPending}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="member-last-name" className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                      Last name
+                    </Label>
+                    <Input
+                      id="member-last-name"
+                      value={lastName}
+                      onChange={(event) => setLastName(event.target.value)}
+                      className="h-10 rounded-xl focus:border-[#C9973E] focus:ring-[#C9973E]/20"
+                      disabled={isPending}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="member-phone" className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                      Phone
+                    </Label>
+                    <Input
+                      id="member-phone"
+                      value={phone}
+                      onChange={(event) => setPhone(event.target.value)}
+                      className="h-10 rounded-xl focus:border-[#C9973E] focus:ring-[#C9973E]/20"
+                      disabled={isPending}
+                    />
+                  </div>
+                </div>
+                {error ? (
+                  <p className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-500">
+                    {error}
+                  </p>
+                ) : null}
+                <div className="mt-5 flex justify-end gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-10 rounded-xl"
+                    onClick={() => setEditing(false)}
+                    disabled={isPending}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    className="h-10 rounded-xl bg-[#C9973E] font-bold uppercase tracking-wider text-black"
+                    onClick={handleSave}
+                    disabled={isPending}
+                  >
+                    {isPending ? "Saving..." : "Save"}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 w-full rounded-xl"
+                onClick={() => setEditing(true)}
+              >
+                <Edit3 className="size-4" />
+                Edit profile
+              </Button>
+            )}
+          </aside>
+
+          <div className="space-y-6 p-6">
+            <section className="rounded-2xl border border-border bg-card">
+              <h4 className="border-b border-border px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                Membership History
+              </h4>
+              <div className="divide-y divide-border">
+                {details.memberships.map((membership) => (
+                  <div key={membership.id} className="flex items-center justify-between gap-4 p-5">
+                    <div className="min-w-0">
+                      <span className="text-sm font-bold text-foreground">{membership.plan_name}</span>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDate(membership.start_date ?? membership.created_at)} to{" "}
+                        {membership.end_date ? formatDate(membership.end_date) : "Ongoing"}
+                      </p>
+                    </div>
+                    <Badge variant="outline" className={statusBadgeClass(membership.status)}>
+                      {membership.status}
+                    </Badge>
+                  </div>
+                ))}
+                {details.memberships.length === 0 ? (
+                  <p className="p-5 text-sm text-muted-foreground">No records found.</p>
+                ) : null}
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-border bg-card">
+              <h4 className="border-b border-border px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                Recent Payments
+              </h4>
+              <div className="divide-y divide-border">
+                {details.payments.map((payment) => (
+                  <div key={payment.id} className="flex items-center justify-between gap-4 p-5">
+                    <div className="min-w-0">
+                      <span className="flex items-center gap-2 text-sm font-bold text-foreground">
+                        <CreditCard className="size-4 text-muted-foreground" />
+                        PHP {payment.amount.toLocaleString()}
+                      </span>
+                      <p className="text-xs text-muted-foreground">
+                        via {payment.payment_method} on {formatDate(payment.created_at)}
+                      </p>
+                    </div>
+                    <Badge variant={payment.status === "CONFIRMED" ? "secondary" : "outline"}>
+                      {payment.status}
+                    </Badge>
+                  </div>
+                ))}
+                {details.payments.length === 0 ? (
+                  <p className="p-5 text-sm text-muted-foreground">No records found.</p>
+                ) : null}
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-border bg-card">
+              <h4 className="border-b border-border px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                Attendance Log (This Branch)
+              </h4>
+              <div className="divide-y divide-border">
+                {details.attendance.map((attendance) => (
+                  <div key={attendance.id} className="flex items-center justify-between gap-4 p-5">
+                    <span className="text-sm font-semibold text-foreground">
+                      {formatDate(attendance.check_in_time)}
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      {new Date(attendance.check_in_time).toLocaleTimeString("en-US", {
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+                ))}
+                {details.attendance.length === 0 ? (
+                  <p className="p-5 text-sm text-muted-foreground">No records found.</p>
+                ) : null}
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function BranchMembersPage({
   data,
   pendingWalkups,
   memberDetails,
+  editMode,
 }: {
   data: BranchMembersData;
   pendingWalkups: PendingMember[];
   memberDetails: MemberDetails | null;
+  editMode: boolean;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -254,75 +516,49 @@ export function BranchMembersPage({
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [planFilter, setPlanFilter] = useState("All");
-  const [checkInFeedback, setCheckInFeedback] = useState<{
-    id: string;
-    type: "success" | "error";
-    message: string;
-  } | null>(null);
+  const [checkInFeedback, setCheckInFeedback] = useState<Feedback>(null);
   const [activatingMember, setActivatingMember] = useState<PendingMember | null>(null);
 
-  // Filtering
-  const filteredMembers = data.members.filter((m) => {
+  const filteredMembers = data.members.filter((member) => {
     if (search.trim()) {
-      const q = search.toLowerCase();
+      const query = search.toLowerCase();
       if (
-        !m.name.toLowerCase().includes(q) &&
-        !m.email.toLowerCase().includes(q)
+        !member.name.toLowerCase().includes(query) &&
+        !member.email.toLowerCase().includes(query) &&
+        !member.homeBranch.toLowerCase().includes(query)
       ) {
         return false;
       }
     }
-    if (statusFilter !== "All" && m.status !== statusFilter) return false;
-    if (planFilter !== "All" && m.plan !== planFilter) return false;
+    if (statusFilter !== "All" && member.status !== statusFilter) return false;
+    if (planFilter !== "All" && member.plan !== planFilter) return false;
     return true;
   });
 
-  function handleView(memberId: string) {
-    router.push(`/branch/members?memberId=${memberId}`);
+  function openMember(memberId: string, mode: "view" | "edit" = "view") {
+    router.push(`/branch/members?memberId=${memberId}${mode === "edit" ? "&edit=1" : ""}`);
   }
 
   function handleCheckIn(memberId: string) {
     startTransition(async () => {
       const result = await manualCheckInFromMembers(memberId);
+      setCheckInFeedback({
+        id: memberId,
+        type: result.success ? "success" : "error",
+        message: result.success ? "Checked in" : result.error ?? "Failed",
+      });
       if (result.success) {
-        setCheckInFeedback({
-          id: memberId,
-          type: "success",
-          message: "Checked in",
-        });
         router.refresh();
-      } else {
-        setCheckInFeedback({
-          id: memberId,
-          type: "error",
-          message: result.error ?? "Failed",
-        });
       }
       setTimeout(() => setCheckInFeedback(null), 3000);
     });
   }
 
   const metrics = [
-    {
-      label: "Total Members",
-      value: data.totalMembers,
-      icon: Users,
-    },
-    {
-      label: "Active",
-      value: data.activeCount,
-      icon: Shield,
-    },
-    {
-      label: "Pending",
-      value: data.pendingCount,
-      icon: Clock,
-    },
-    {
-      label: "Expired / Cancelled",
-      value: data.expiredCount,
-      icon: XCircle,
-    },
+    { label: "Total Members", value: data.totalMembers, icon: Users },
+    { label: "Active", value: data.activeCount, icon: Shield },
+    { label: "Pending", value: data.pendingCount, icon: Clock },
+    { label: "Expired / Cancelled", value: data.expiredCount, icon: XCircle },
   ];
 
   return (
@@ -330,13 +566,12 @@ export function BranchMembersPage({
       <div className="space-y-8">
         <AdminPageHeader title="Members" />
 
-        {/* Metric Cards */}
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {metrics.map((metric) => (
-            <Card key={metric.label} className="overflow-hidden rounded-[28px]">
+            <Card key={metric.label} className="overflow-hidden rounded-3xl">
               <CardHeader className="gap-5 p-6">
                 <div className="flex items-center justify-between">
-                  <CardDescription className="text-[11px] font-semibold uppercase tracking-[0.18em]">
+                  <CardDescription className="text-[11px] font-bold uppercase tracking-[0.18em]">
                     {metric.label}
                   </CardDescription>
                   <metric.icon className="size-5 text-muted-foreground" />
@@ -349,8 +584,7 @@ export function BranchMembersPage({
           ))}
         </div>
 
-        {/* Tab bar */}
-        <div role="tablist" className="flex items-center gap-1 rounded-2xl border border-border bg-secondary/30 p-1 w-fit">
+        <div role="tablist" className="flex w-fit items-center gap-1 rounded-2xl border border-border bg-secondary/30 p-1">
           <button
             type="button"
             role="tab"
@@ -360,11 +594,11 @@ export function BranchMembersPage({
             onClick={() => setActiveTab("members")}
             className={`rounded-xl px-5 py-2.5 text-[11px] font-bold uppercase tracking-[0.16em] transition-colors ${
               activeTab === "members"
-                ? "bg-foreground text-background shadow-sm"
+                ? "bg-foreground text-background"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            Branch Members
+            Member Directory
           </button>
           <button
             type="button"
@@ -375,40 +609,35 @@ export function BranchMembersPage({
             onClick={() => setActiveTab("walkups")}
             className={`rounded-xl px-5 py-2.5 text-[11px] font-bold uppercase tracking-[0.16em] transition-colors ${
               activeTab === "walkups"
-                ? "bg-foreground text-background shadow-sm"
+                ? "bg-foreground text-background"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
             Pending Walkups
-            {pendingWalkups.length > 0 && (
-              <span className="ml-2 inline-flex size-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">
+            {pendingWalkups.length > 0 ? (
+              <span className="ml-2 inline-flex size-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-black">
                 {pendingWalkups.length}
               </span>
-            )}
+            ) : null}
           </button>
         </div>
 
-        {/* ── Branch Members Tab ── */}
-        {activeTab === "members" && (
-          <Card id="tab-members-panel" role="tabpanel" aria-labelledby="tab-members-tab" className="rounded-[30px]">
-            <CardHeader className="border-b border-border/70 p-6">
+        {activeTab === "members" ? (
+          <Card id="tab-members-panel" role="tabpanel" aria-labelledby="tab-members-tab" className="rounded-3xl">
+            <CardHeader className="border-b border-border p-6">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <CardTitle>Directory</CardTitle>
-
-                {/* Filters */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <div className="relative min-w-[200px]">
-                    <Input
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      placeholder="Search name or email..."
-                      className="h-10 rounded-xl border-border bg-background pl-4 text-sm"
-                    />
-                  </div>
+                  <Input
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Search name, email, branch..."
+                    className="h-10 w-full rounded-xl border-border bg-background pl-4 text-sm focus:border-[#C9973E] focus:ring-[#C9973E]/20 sm:w-[240px]"
+                  />
                   <Select
                     value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="h-10 w-full sm:w-[140px] rounded-xl border-border bg-background text-sm"
+                    onChange={(event) => setStatusFilter(event.target.value)}
+                    className="h-10 w-full rounded-xl border-border bg-background text-sm sm:w-[140px]"
                   >
                     <option value="All">All Status</option>
                     <option value="ACTIVE">Active</option>
@@ -416,11 +645,11 @@ export function BranchMembersPage({
                     <option value="EXPIRED">Expired</option>
                     <option value="CANCELLED">Cancelled</option>
                   </Select>
-                  {data.plans.length > 0 && (
+                  {data.plans.length > 0 ? (
                     <Select
                       value={planFilter}
-                      onChange={(e) => setPlanFilter(e.target.value)}
-                      className="h-10 w-full sm:w-[140px] rounded-xl border-border bg-background text-sm"
+                      onChange={(event) => setPlanFilter(event.target.value)}
+                      className="h-10 w-full rounded-xl border-border bg-background text-sm sm:w-[140px]"
                     >
                       <option value="All">All Plans</option>
                       {data.plans.map((plan) => (
@@ -429,110 +658,83 @@ export function BranchMembersPage({
                         </option>
                       ))}
                     </Select>
-                  )}
+                  ) : null}
                 </div>
               </div>
             </CardHeader>
             <CardContent className="p-6">
               {filteredMembers.length === 0 ? (
-                <p className="py-16 text-center text-sm text-muted-foreground">
-                  No members found
-                </p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table className="min-w-[720px]">
-                    <TableHeader>
-                      <TableRow className="hover:bg-transparent">
-                        <TableHead>Name</TableHead>
-                        <TableHead>Plan</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Joined</TableHead>
-                        <TableHead>Last Check-in</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredMembers.map((member) => (
-                        <TableRow key={member.id}>
-                          <TableCell>
-                            <div>
-                              <p className="text-[15px] font-medium">
-                                {member.name}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {member.email}
-                              </p>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-[15px]">
-                            {member.plan}
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant="secondary"
-                              className={statusBadgeClass(member.status)}
-                            >
-                              {member.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-[15px] text-muted-foreground">
-                            {member.joined}
-                          </TableCell>
-                          <TableCell className="text-[15px] text-muted-foreground">
-                            {member.lastCheckIn}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-8 rounded-full px-3 text-[10px] font-semibold uppercase tracking-[0.14em]"
-                                onClick={() => handleView(member.id)}
-                              >
-                                <Eye className="mr-1 size-3" />
-                                View
-                              </Button>
-                              {member.status === "ACTIVE" && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className={`h-8 rounded-full px-3 text-[10px] font-semibold uppercase tracking-[0.14em] ${
-                                    checkInFeedback?.id === member.id
-                                      ? checkInFeedback.type === "success"
-                                        ? "border-emerald-500 text-emerald-600"
-                                        : "border-rose-500 text-rose-600"
-                                      : ""
-                                  }`}
-                                  onClick={() => handleCheckIn(member.id)}
-                                  disabled={isPending}
-                                >
-                                  <UserCheck className="mr-1 size-3" />
-                                  {checkInFeedback?.id === member.id
-                                    ? checkInFeedback.message
-                                    : "Check In"}
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                <div className="rounded-2xl border border-dashed border-border p-8 text-center md:p-12">
+                  <p className="text-sm font-semibold text-foreground">No members found</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Try another search or filter.</p>
                 </div>
+              ) : (
+                <Table className="min-w-[820px]">
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead>Name</TableHead>
+                      <TableHead>Home Branch</TableHead>
+                      <TableHead>Plan</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Joined</TableHead>
+                      <TableHead>Last Check-in</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredMembers.map((member) => (
+                      <TableRow
+                        key={member.id}
+                        className="cursor-pointer"
+                        tabIndex={0}
+                        onClick={() => openMember(member.id)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            openMember(member.id);
+                          }
+                        }}
+                      >
+                        <TableCell>
+                          <div>
+                            <p className="text-[15px] font-semibold">{member.name}</p>
+                            <p className="text-xs text-muted-foreground">{member.email}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-[15px] text-muted-foreground">{member.homeBranch}</TableCell>
+                        <TableCell className="text-[15px]">{member.plan}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className={statusBadgeClass(member.status)}>
+                            {member.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-[15px] text-muted-foreground">{member.joined}</TableCell>
+                        <TableCell className="text-[15px] text-muted-foreground">{member.lastCheckIn}</TableCell>
+                        <TableCell>
+                          <MemberActionsMenu
+                            member={member}
+                            isPending={isPending}
+                            feedback={checkInFeedback}
+                            onEdit={() => openMember(member.id, "edit")}
+                            onCheckIn={() => handleCheckIn(member.id)}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
             </CardContent>
           </Card>
-        )}
+        ) : null}
 
-        {/* ── Pending Walkups Tab ── */}
-        {activeTab === "walkups" && (
-          <Card id="tab-walkups-panel" role="tabpanel" aria-labelledby="tab-walkups-tab" className="rounded-[30px]">
-            <CardHeader className="flex-row items-center justify-between space-y-0 border-b border-border/70 p-6">
+        {activeTab === "walkups" ? (
+          <Card id="tab-walkups-panel" role="tabpanel" aria-labelledby="tab-walkups-tab" className="rounded-3xl">
+            <CardHeader className="flex-row items-center justify-between space-y-0 border-b border-border p-6">
               <div>
                 <CardTitle>Pending Walkups</CardTitle>
                 <CardDescription className="mt-1 text-xs">
-                  Members who registered online but haven&apos;t been activated
-                  at any branch yet
+                  Members who registered online but have not been activated at any branch yet.
                 </CardDescription>
               </div>
               <Badge variant="secondary" className="badge-pending">
@@ -541,74 +743,63 @@ export function BranchMembersPage({
             </CardHeader>
             <CardContent className="p-6">
               {pendingWalkups.length === 0 ? (
-                <p className="py-16 text-center text-sm text-muted-foreground">
-                  No pending walkups
-                </p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table className="min-w-[640px]">
-                    <TableHeader>
-                      <TableRow className="hover:bg-transparent">
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Plan</TableHead>
-                        <TableHead>Registered</TableHead>
-                        <TableHead>Action</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {pendingWalkups.map((member) => (
-                        <TableRow key={member.id}>
-                          <TableCell className="text-[15px] font-medium">
-                            {member.name}
-                          </TableCell>
-                          <TableCell className="text-[15px] text-muted-foreground">
-                            {member.email}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="text-[10px]">
-                              {member.plan}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-[15px] text-muted-foreground">
-                            {member.registeredDate}
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              size="sm"
-                              className="h-8 rounded-full px-4 text-[10px] font-semibold uppercase tracking-[0.14em]"
-                              onClick={() => setActivatingMember(member)}
-                            >
-                              <UserPlus className="mr-1 size-3" />
-                              Activate
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                <div className="rounded-2xl border border-dashed border-border p-8 text-center md:p-12">
+                  <p className="text-sm font-semibold text-foreground">No pending walkups</p>
+                  <p className="mt-1 text-xs text-muted-foreground">New online registrations will appear here.</p>
                 </div>
+              ) : (
+                <Table className="min-w-[640px]">
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Plan</TableHead>
+                      <TableHead>Registered</TableHead>
+                      <TableHead>Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pendingWalkups.map((member) => (
+                      <TableRow key={member.id}>
+                        <TableCell className="text-[15px] font-medium">{member.name}</TableCell>
+                        <TableCell className="text-[15px] text-muted-foreground">{member.email}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-[10px]">
+                            {member.plan}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-[15px] text-muted-foreground">{member.registeredDate}</TableCell>
+                        <TableCell>
+                          <Button
+                            size="sm"
+                            className="h-10 rounded-xl bg-[#C9973E] px-4 text-[10px] font-bold uppercase tracking-wider text-black"
+                            onClick={() => setActivatingMember(member)}
+                          >
+                            <UserPlus className="size-4" />
+                            Activate
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
             </CardContent>
           </Card>
-        )}
+        ) : null}
       </div>
 
-      {/* Member detail sheet */}
-      {memberDetails && (
+      {memberDetails ? (
         <BranchMemberSheet
           details={memberDetails}
+          editMode={editMode}
           onClose={() => router.push("/branch/members")}
         />
-      )}
+      ) : null}
 
-      {/* Activate modal for walkups */}
-      {activatingMember && (
-        <ActivateModal
-          member={activatingMember}
-          onClose={() => setActivatingMember(null)}
-        />
-      )}
+      {activatingMember ? (
+        <ActivateModal member={activatingMember} onClose={() => setActivatingMember(null)} />
+      ) : null}
     </AdminPageTransition>
   );
 }

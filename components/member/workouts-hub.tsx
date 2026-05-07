@@ -1,18 +1,19 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import {
-  Plus, Play, Search, Trash2, Edit3, Clock, Dumbbell,
-  ChevronDown, ChevronRight, Heart, X, CalendarCheck,
+  Plus, Play, Search, Trash2, Edit3, Dumbbell,
+  ChevronDown, Heart, X, CalendarCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
 import {
-  type Exercise, getExercises, searchExercises, getBodyParts, getFormTip,
+  type Exercise, getExercises, searchExercises, getBodyParts,
 } from "@/lib/exercises";
 import { createRoutine, deleteRoutine, updateRoutine } from "@/app/(dashboard)/dashboard/workouts/actions";
 
@@ -60,6 +61,7 @@ interface WorkoutsHubProps {
 
 const TABS = ["My Routines", "Log History", "Exercise Library"] as const;
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const LIBRARY_PAGE_SIZE = 10;
 
 /* ─── Main ─── */
 export function WorkoutsHub({ routines, sessions }: WorkoutsHubProps) {
@@ -291,25 +293,31 @@ function LibraryTab() {
   const [query, setQuery] = useState("");
   const [bodyPart, setBodyPart] = useState("all");
   const [bodyParts, setBodyParts] = useState<string[]>([]);
-  const [results, setResults] = useState<Exercise[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isMuscleMenuOpen, setIsMuscleMenuOpen] = useState(false);
   const [selected, setSelected] = useState<Exercise | null>(null);
   const [favIds, setFavIds] = useState<Set<string>>(new Set());
+  const muscleMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     getExercises().then((data) => {
       setExercises(data);
       setBodyParts(getBodyParts(data));
-      setResults(data.slice(0, 30));
       const saved = localStorage.getItem("fav_exercises");
       if (saved) setFavIds(new Set(JSON.parse(saved)));
     });
   }, []);
 
   useEffect(() => {
-    if (exercises.length) {
-      setResults(searchExercises(exercises, query, bodyPart));
+    function handleClick(event: MouseEvent) {
+      if (muscleMenuRef.current && !muscleMenuRef.current.contains(event.target as Node)) {
+        setIsMuscleMenuOpen(false);
+      }
     }
-  }, [query, bodyPart, exercises]);
+
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
 
   const toggleFav = useCallback((id: string) => {
     setFavIds((prev) => {
@@ -321,30 +329,82 @@ function LibraryTab() {
     });
   }, []);
 
+  const results = useMemo(
+    () => (exercises.length ? searchExercises(exercises, query, bodyPart) : []),
+    [bodyPart, exercises, query]
+  );
+  const totalPages = Math.max(1, Math.ceil(results.length / LIBRARY_PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const pageStart = (safePage - 1) * LIBRARY_PAGE_SIZE;
+  const paginatedResults = results.slice(pageStart, pageStart + LIBRARY_PAGE_SIZE);
+  const muscleOptions = ["all", ...bodyParts];
+  const selectedMuscleLabel =
+    bodyPart === "all" ? "All Muscles" : bodyPart.charAt(0).toUpperCase() + bodyPart.slice(1);
+
+  function selectMuscle(value: string) {
+    setBodyPart(value);
+    setCurrentPage(1);
+    setIsMuscleMenuOpen(false);
+  }
+
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search exercises..."
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="h-10 rounded-xl pl-9"
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="h-10 rounded-xl pl-9 focus:border-[#C9973E] focus:ring-[#C9973E]/20"
           />
         </div>
-        <select
-          value={bodyPart}
-          onChange={(e) => setBodyPart(e.target.value)}
-          className="h-10 rounded-xl border border-input bg-transparent px-3 text-[12px] text-foreground"
-        >
-          <option value="all">All Muscles</option>
-          {bodyParts.map((bp) => (
-            <option key={bp} value={bp}>
-              {bp.charAt(0).toUpperCase() + bp.slice(1)}
-            </option>
-          ))}
-        </select>
+        <div className="relative sm:w-44" ref={muscleMenuRef}>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-10 w-full justify-between rounded-xl px-3 text-[12px] font-semibold"
+            onClick={() => setIsMuscleMenuOpen((open) => !open)}
+            aria-expanded={isMuscleMenuOpen}
+          >
+            {selectedMuscleLabel}
+            <ChevronDown
+              className={cn(
+                "size-4 text-muted-foreground transition-transform",
+                isMuscleMenuOpen && "rotate-180"
+              )}
+            />
+          </Button>
+
+          {isMuscleMenuOpen ? (
+            <div className="fitness-scroll absolute right-0 top-12 z-30 max-h-60 w-full overflow-y-auto rounded-2xl border border-border bg-card p-1 pr-2">
+              {muscleOptions.map((option) => {
+                const label =
+                  option === "all" ? "All Muscles" : option.charAt(0).toUpperCase() + option.slice(1);
+                const isSelected = option === bodyPart;
+
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    className={cn(
+                      "flex h-10 w-full items-center rounded-xl px-3 text-left text-[12px] font-semibold transition-colors",
+                      isSelected
+                        ? "bg-[#C9973E] text-black"
+                        : "text-foreground hover:bg-secondary"
+                    )}
+                    onClick={() => selectMuscle(option)}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+        </div>
       </div>
 
       {results.length === 0 ? (
@@ -359,7 +419,7 @@ function LibraryTab() {
         </div>
       ) : (
         <div className="space-y-2">
-          {results.map((ex) => (
+          {paginatedResults.map((ex) => (
             <button
               key={ex.id}
               onClick={() => setSelected(ex)}
@@ -396,6 +456,38 @@ function LibraryTab() {
           ))}
         </div>
       )}
+
+      {results.length > LIBRARY_PAGE_SIZE ? (
+        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-[12px] text-muted-foreground">
+            Showing {pageStart + 1}-{Math.min(pageStart + LIBRARY_PAGE_SIZE, results.length)} of{" "}
+            {results.length} exercises
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 rounded-xl"
+              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+              disabled={safePage === 1}
+            >
+              Previous
+            </Button>
+            <span className="min-w-16 text-center text-[12px] font-semibold text-foreground">
+              {safePage} / {totalPages}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 rounded-xl"
+              onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+              disabled={safePage === totalPages}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {/* Exercise Detail Sheet */}
       <Sheet open={!!selected} onOpenChange={() => setSelected(null)}>

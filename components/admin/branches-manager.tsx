@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, useEffect, useCallback } from "react";
-import { MapPin, Users, X, Edit2, Building2, UserCircle } from "lucide-react";
+import { MapPin, X, Edit2, Building2, UserCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 
@@ -47,22 +47,20 @@ export function BranchesManager({
     });
   }
 
-  function closeEditor() {
+  const closeEditor = useCallback(() => {
     if (isPending) return;
     setErrorMessage("");
     setEditingBranch(null);
-  }
-
-  const stableCloseEditor = useCallback(closeEditor, [isPending]);
+  }, [isPending]);
 
   useEffect(() => {
     if (!editingBranch) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") stableCloseEditor();
+      if (e.key === "Escape") closeEditor();
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [editingBranch, stableCloseEditor]);
+  }, [editingBranch, closeEditor]);
 
   function updateField(field: "name" | "location", value: string) {
     setEditingBranch((current) => (current ? { ...current, [field]: value } : current));
@@ -158,7 +156,7 @@ export function BranchesManager({
               <div className="relative z-10 mt-10 flex items-end justify-between border-t border-border/50 pt-6">
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-                    Home Members
+                    Activated Here
                   </p>
                   <div className="flex items-baseline gap-2">
                     <span className="font-display text-4xl font-black tracking-tighter text-foreground leading-none">

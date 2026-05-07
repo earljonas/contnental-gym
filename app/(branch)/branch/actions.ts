@@ -28,15 +28,62 @@ export async function activateMember(data: {
 
     const branchId = roleInfo.branch_id;
 
-    // 1. Assign the member to this branch
-    const { error: profileError } = await supabase
+    const { data: targetMember, error: targetError } = await supabase
       .from("profiles")
-      .update({ branch_id: branchId })
-      .eq("id", data.memberId);
+      .select("id, role, branch_id")
+      .eq("id", data.memberId)
+      .eq("role", "MEMBER")
+      .maybeSingle();
 
-    if (profileError) {
-      console.error("[activateMember] profile update failed:", profileError);
-      return { error: "Failed to assign branch" };
+    if (targetError) {
+      console.error("[activateMember] target profile lookup failed:", targetError);
+      return { error: "Failed to load member" };
+    }
+
+    if (!targetMember) {
+      return { error: "Member not found" };
+    }
+
+    if (targetMember.branch_id && targetMember.branch_id !== branchId) {
+      return { error: "Member is already assigned to another branch" };
+    }
+
+    const { data: pendingMembership, error: pendingMembershipError } = await supabase
+      .from("memberships")
+      .select("id, user_id, status, plan_id")
+      .eq("id", data.membershipId)
+      .eq("user_id", data.memberId)
+      .eq("status", "PENDING")
+      .maybeSingle();
+
+    if (pendingMembershipError) {
+      console.error("[activateMember] pending membership lookup failed:", pendingMembershipError);
+      return { error: "Failed to load pending membership" };
+    }
+
+    if (!pendingMembership) {
+      return { error: "Pending membership not found" };
+    }
+
+    // 1. Assign the member to this branch. Supabase can return no error when
+    // RLS updates zero rows, so request the updated row and verify it.
+    if (targetMember.branch_id === null) {
+      const { data: updatedProfile, error: profileError } = await supabase
+        .from("profiles")
+        .update({ branch_id: branchId })
+        .eq("id", data.memberId)
+        .is("branch_id", null)
+        .select("id, branch_id")
+        .maybeSingle();
+
+      if (profileError) {
+        console.error("[activateMember] profile update failed:", profileError);
+        return { error: "Failed to assign branch" };
+      }
+
+      if (!updatedProfile || updatedProfile.branch_id !== branchId) {
+        return { error: "Failed to assign branch" };
+      }
     }
 
     // 2. Activate the membership
@@ -45,24 +92,32 @@ export async function activateMember(data: {
     const { data: plan } = await supabase
       .from("membership_plans")
       .select("duration")
-      .eq("id", data.planId)
+      .eq("id", pendingMembership.plan_id)
       .single();
 
     const duration = plan?.duration ?? 30;
     const endDate = new Date(today);
     endDate.setDate(endDate.getDate() + duration);
 
-    const { error: membershipError } = await supabase
+    const { data: activatedMembership, error: membershipError } = await supabase
       .from("memberships")
       .update({
         status: "ACTIVE",
         start_date: today.toISOString().split("T")[0],
         end_date: endDate.toISOString().split("T")[0],
       })
-      .eq("id", data.membershipId);
+      .eq("id", data.membershipId)
+      .eq("user_id", data.memberId)
+      .eq("status", "PENDING")
+      .select("id, status")
+      .maybeSingle();
 
     if (membershipError) {
       console.error("[activateMember] membership update failed:", membershipError);
+      return { error: "Failed to activate membership" };
+    }
+
+    if (!activatedMembership || activatedMembership.status !== "ACTIVE") {
       return { error: "Failed to activate membership" };
     }
 
@@ -70,6 +125,7 @@ export async function activateMember(data: {
     const { error: paymentError } = await supabase.from("payments").insert({
       user_id: data.memberId,
       membership_id: data.membershipId,
+      branch_id: branchId,
       amount: data.amount,
       payment_method: data.paymentMethod,
       status: "CONFIRMED",

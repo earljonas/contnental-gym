@@ -16,19 +16,32 @@ type MemberOption = {
   name: string;
 };
 
-export function RecordPaymentButton({ members }: { members: MemberOption[] }) {
+type BranchOption = {
+  id: number;
+  name: string;
+};
+
+export function RecordPaymentButton({
+  members,
+  branches,
+}: {
+  members: MemberOption[];
+  branches: BranchOption[];
+}) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
 
   const [userId, setUserId] = useState("");
+  const [branchId, setBranchId] = useState("");
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<"CASH" | "GCASH">("CASH");
   const [referenceNumber, setReferenceNumber] = useState("");
 
   function resetForm() {
     setUserId("");
+    setBranchId("");
     setAmount("");
     setMethod("CASH");
     setReferenceNumber("");
@@ -46,6 +59,10 @@ export function RecordPaymentButton({ members }: { members: MemberOption[] }) {
       setError("Please select a member.");
       return;
     }
+    if (!branchId) {
+      setError("Please select the collection branch.");
+      return;
+    }
     const numAmount = Number.parseFloat(amount);
     if (!numAmount || numAmount <= 0) {
       setError("Please enter a valid amount.");
@@ -56,6 +73,7 @@ export function RecordPaymentButton({ members }: { members: MemberOption[] }) {
       setError("");
       const result = await recordPayment({
         userId,
+        branchId: Number(branchId),
         amount: numAmount,
         method,
         referenceNumber: referenceNumber.trim() || undefined,
@@ -133,6 +151,26 @@ export function RecordPaymentButton({ members }: { members: MemberOption[] }) {
                   {members.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+
+              <div className="space-y-2.5">
+                <Label htmlFor="payment-branch" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                  Collected At
+                </Label>
+                <Select
+                  id="payment-branch"
+                  value={branchId}
+                  onChange={(e) => setBranchId(e.target.value)}
+                  className="h-12 rounded-2xl bg-secondary/20"
+                  disabled={isPending}
+                >
+                  <option value="">Select branch</option>
+                  {branches.map((branch) => (
+                    <option key={branch.id} value={branch.id}>
+                      {branch.name}
                     </option>
                   ))}
                 </Select>

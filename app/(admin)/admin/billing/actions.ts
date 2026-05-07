@@ -28,6 +28,7 @@ export async function confirmPayment(paymentId: number) {
 
 export async function recordPayment(formData: {
   userId: string;
+  branchId: number;
   amount: number;
   method: "CASH" | "GCASH";
   referenceNumber?: string;
@@ -38,8 +39,38 @@ export async function recordPayment(formData: {
     // Get current user for confirmed_by
     const { data: { user } } = await supabase.auth.getUser();
 
+    const { data: memberships } = await supabase
+      .from("memberships")
+      .select("id, status")
+      .eq("user_id", formData.userId)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    const membership = memberships?.[0] ?? null;
+    if (!membership) {
+      return { error: "Member has no membership to pay for" };
+    }
+
+    if (membership.status !== "PENDING") {
+      return { error: "Member already has an active or settled membership" };
+    }
+
+    const { data: existingPayment } = await supabase
+      .from("payments")
+      .select("id")
+      .eq("membership_id", membership.id)
+      .eq("status", "CONFIRMED")
+      .limit(1)
+      .maybeSingle();
+
+    if (existingPayment) {
+      return { error: "Current membership is already paid" };
+    }
+
     const { error } = await supabase.from("payments").insert({
       user_id: formData.userId,
+      membership_id: membership.id,
+      branch_id: formData.branchId,
       amount: formData.amount,
       payment_method: formData.method,
       status: "CONFIRMED",
@@ -61,4 +92,3 @@ export async function recordPayment(formData: {
     return { error: "Unexpected error occurred" };
   }
 }
-

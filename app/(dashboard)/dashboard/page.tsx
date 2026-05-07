@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { MemberHome } from "@/components/member/member-home";
+import { pickCurrentMembership } from "@/lib/member-membership";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -18,6 +19,7 @@ export default async function DashboardPage() {
     status: string;
     start_date: string | null;
     end_date: string | null;
+    created_at: string | null;
     plan_id: number;
     membership_plans: { name: string; price: number } | null;
   };
@@ -25,13 +27,12 @@ export default async function DashboardPage() {
   // ── Latest membership with end_date ──
   const { data: membershipData } = await supabase
     .from("memberships")
-    .select("status, start_date, end_date, plan_id, membership_plans(name, price)")
+    .select("status, start_date, end_date, created_at, plan_id, membership_plans(name, price)")
     .eq("user_id", user!.id)
     .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(10);
 
-  const membership = membershipData as MembershipWithPlan | null;
+  const membership = pickCurrentMembership((membershipData ?? []) as unknown as MembershipWithPlan[]);
 
   // ── This week's attendance (Mon–Sun) ──
   const now = new Date();

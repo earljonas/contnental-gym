@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { pickCurrentMembership } from "@/lib/member-membership";
 
 export type BranchCheckIn = {
   memberName: string;
@@ -295,12 +296,12 @@ export async function lookupMemberForCheckIn(memberId: string): Promise<MemberLo
 
 export async function getSearchableMembers(branchId: number): Promise<SearchableMember[]> {
   const supabase = await createClient();
+  void branchId;
 
   const { data } = await supabase
     .from("profiles")
     .select("id, first_name, last_name")
     .eq("role", "MEMBER")
-    .eq("branch_id", branchId)
     .order("first_name");
 
   return (data ?? []).map((p) => ({
@@ -315,6 +316,7 @@ export type MemberRow = {
   id: string;
   name: string;
   email: string;
+  homeBranch: string;
   plan: string;
   status: string;
   joined: string;
@@ -328,6 +330,31 @@ export type BranchMembersData = {
   pendingCount: number;
   expiredCount: number;
   plans: string[];
+};
+
+type BranchMemberProfileRow = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  created_at: string;
+  branch_id: number | null;
+  branches: { name?: string | null } | { name?: string | null }[] | null;
+};
+
+type BranchMemberMembershipRow = {
+  id: number;
+  user_id: string;
+  status: string;
+  plan_id: number | null;
+  created_at: string | null;
+  end_date?: string | null;
+  membership_plans: { name?: string | null } | null;
+};
+
+type BranchMemberAttendanceRow = {
+  user_id: string;
+  check_in_time: string;
 };
 
 export type MemberDetails = {
@@ -363,33 +390,62 @@ export type MemberDetails = {
 
 export async function getBranchMembers(branchId: number): Promise<BranchMembersData> {
   const supabase = await createClient();
+  void branchId;
 
-  const { data: profiles } = await supabase
-    .from("profiles")
-    .select(`
-      id, first_name, last_name, email, created_at,
-      memberships(id, status, plan_id, created_at, membership_plans(name)),
-      attendance(check_in_time)
-    `)
-    .eq("role", "MEMBER")
-    .eq("branch_id", branchId)
-    .order("created_at", { ascending: false });
+  const [profilesResult, membershipsResult, attendanceResult] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, first_name, last_name, email, created_at, branch_id, branches(name)")
+      .eq("role", "MEMBER")
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("memberships")
+      .select("id, user_id, status, plan_id, created_at, end_date, membership_plans(name)")
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("attendance")
+      .select("user_id, check_in_time")
+      .order("check_in_time", { ascending: false }),
+  ]);
 
-  const members: MemberRow[] = (profiles ?? []).map((p) => {
-    const memberships = Array.isArray(p.memberships) ? p.memberships : [];
-    const sortedMemberships = [...memberships].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    const latestMembership = sortedMemberships[0];
+  if (profilesResult.error) {
+    console.error("[getBranchMembers] profiles error:", profilesResult.error);
+  }
+  if (membershipsResult.error) {
+    console.error("[getBranchMembers] memberships error:", membershipsResult.error);
+  }
+  if (attendanceResult.error) {
+    console.error("[getBranchMembers] attendance error:", attendanceResult.error);
+  }
+
+  const profiles = (profilesResult.data ?? []) as BranchMemberProfileRow[];
+  const membershipsByUser = new Map<string, BranchMemberMembershipRow[]>();
+  for (const membership of (membershipsResult.data ?? []) as BranchMemberMembershipRow[]) {
+    const userMemberships = membershipsByUser.get(membership.user_id) ?? [];
+    userMemberships.push(membership);
+    membershipsByUser.set(membership.user_id, userMemberships);
+  }
+
+  const latestAttendanceByUser = new Map<string, string>();
+  for (const attendance of (attendanceResult.data ?? []) as BranchMemberAttendanceRow[]) {
+    if (!latestAttendanceByUser.has(attendance.user_id)) {
+      latestAttendanceByUser.set(attendance.user_id, attendance.check_in_time);
+    }
+  }
+
+  const members: MemberRow[] = profiles.map((p) => {
+    const memberships = membershipsByUser.get(p.id) ?? [];
+    const latestMembership = pickCurrentMembership(memberships);
     const plan = latestMembership?.membership_plans as unknown as { name: string } | null;
-
-    const attendanceList = Array.isArray(p.attendance) ? p.attendance : [];
-    const latestCheckIn = attendanceList
-      .map((a) => new Date(a.check_in_time))
-      .sort((a, b) => b.getTime() - a.getTime())[0];
+    const branch = Array.isArray(p.branches) ? p.branches[0] : p.branches;
+    const latestCheckInTime = latestAttendanceByUser.get(p.id);
+    const latestCheckIn = latestCheckInTime ? new Date(latestCheckInTime) : null;
 
     return {
       id: p.id,
       name: `${p.first_name} ${p.last_name}`.trim(),
       email: p.email,
+      homeBranch: (branch as { name?: string } | null)?.name ?? "Unassigned",
       plan: plan?.name ?? "No plan",
       status: latestMembership?.status ?? "NONE",
       joined: new Date(p.created_at).toLocaleDateString("en-US", {
@@ -434,8 +490,8 @@ export async function getBranchMemberDetails(
     .from("profiles")
     .select("id, first_name, last_name, email, phone, avatar_url, created_at, branch_id")
     .eq("id", memberId)
-    .eq("branch_id", branchId)
     .single();
+  void branchId;
 
   if (!profile) return null;
 
@@ -506,22 +562,33 @@ export type BillingMemberOption = {
   planPrice: number;
 };
 
+type BillingMemberProfileRow = {
+  id: string;
+  first_name: string;
+  last_name: string;
+};
+
+type BillingMemberMembershipRow = {
+  id: number;
+  user_id: string;
+  status: string;
+  created_at: string | null;
+  end_date?: string | null;
+  membership_plans: { price?: number | null } | null;
+};
+
 export async function getBranchBilling(branchId: number): Promise<BranchBillingData> {
   const supabase = await createClient();
 
   const { data: payments } = await supabase
     .from("payments")
     .select(`
-      id, user_id, amount, payment_method, status, created_at, reference_number,
-      profiles!payments_user_id_fkey(first_name, last_name, branch_id),
+      id, user_id, branch_id, amount, payment_method, status, created_at, reference_number,
+      profiles!payments_user_id_fkey(first_name, last_name),
       memberships(membership_plans(name))
     `)
+    .eq("branch_id", branchId)
     .order("created_at", { ascending: false });
-
-  const branchPayments = (payments ?? []).filter((p) => {
-    const profile = p.profiles as unknown as { branch_id: number | null } | null;
-    return profile?.branch_id === branchId;
-  });
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -533,13 +600,15 @@ export async function getBranchBilling(branchId: number): Promise<BranchBillingD
   let overdue = 0;
   let totalCollected = 0;
 
-  const rows: BillingRow[] = branchPayments.map((p) => {
+  const rows: BillingRow[] = (payments ?? []).map((p) => {
     const profile = p.profiles as unknown as {
       first_name: string;
       last_name: string;
     } | null;
     const membership = Array.isArray(p.memberships) ? p.memberships[0] : p.memberships;
-    const plan = (membership as any)?.membership_plans as unknown as { name: string } | null;
+    const plan =
+      (membership as unknown as { membership_plans?: { name: string } | null } | null)
+        ?.membership_plans ?? null;
 
     const createdAt = new Date(p.created_at);
     const isThisMonth = createdAt >= monthStart;
@@ -592,25 +661,87 @@ export async function getBillingMemberOptions(
   branchId: number
 ): Promise<BillingMemberOption[]> {
   const supabase = await createClient();
+  void branchId;
 
-  const { data } = await supabase
-    .from("profiles")
-    .select("id, first_name, last_name, memberships(created_at, membership_plans(price))")
-    .eq("role", "MEMBER")
-    .eq("branch_id", branchId)
-    .order("first_name");
+  const [profilesResult, membershipsResult] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, first_name, last_name")
+      .eq("role", "MEMBER")
+      .order("first_name"),
+    supabase
+      .from("memberships")
+      .select("id, user_id, status, created_at, end_date, membership_plans(price)")
+      .order("created_at", { ascending: false }),
+  ]);
 
-  return (data ?? []).map((p) => {
-    const memberships = Array.isArray(p.memberships) ? p.memberships : [];
-    const sortedMemberships = [...memberships].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    const latestPlan = sortedMemberships[0]?.membership_plans as unknown as { price: number } | null;
+  if (profilesResult.error) {
+    console.error("[getBillingMemberOptions] profiles error:", profilesResult.error);
+  }
+  if (membershipsResult.error) {
+    console.error("[getBillingMemberOptions] memberships error:", membershipsResult.error);
+  }
 
-    return {
-      id: p.id,
-      name: `${p.first_name} ${p.last_name}`.trim(),
-      planPrice: latestPlan?.price ?? 0,
-    };
-  });
+  const profiles = (profilesResult.data ?? []) as BillingMemberProfileRow[];
+  const membershipsByUser = new Map<string, BillingMemberMembershipRow[]>();
+  for (const membership of (membershipsResult.data ?? []) as BillingMemberMembershipRow[]) {
+    const userMemberships = membershipsByUser.get(membership.user_id) ?? [];
+    userMemberships.push(membership);
+    membershipsByUser.set(membership.user_id, userMemberships);
+  }
+
+  const pendingMembershipsByUser = profiles
+    .map((profile) => {
+      const memberships = membershipsByUser.get(profile.id) ?? [];
+      const latestMembership = pickCurrentMembership(memberships);
+      const latestPlan = latestMembership?.membership_plans as unknown as { price: number } | null;
+
+      if (!latestMembership || latestMembership.status !== "PENDING") {
+        return null;
+      }
+
+      return {
+        profile,
+        membershipId: latestMembership.id,
+        planPrice: latestPlan?.price ?? 0,
+      };
+    })
+    .filter(
+      (
+        option
+      ): option is {
+        profile: BillingMemberProfileRow;
+        membershipId: number;
+        planPrice: number;
+      } => option !== null
+    );
+
+  const membershipIds = pendingMembershipsByUser.map((option) => option.membershipId);
+  if (membershipIds.length === 0) {
+    return [];
+  }
+
+  const { data: confirmedPayments, error: confirmedPaymentsError } = await supabase
+    .from("payments")
+    .select("membership_id")
+    .in("membership_id", membershipIds)
+    .eq("status", "CONFIRMED");
+
+  if (confirmedPaymentsError) {
+    console.error("[getBillingMemberOptions] payments error:", confirmedPaymentsError);
+  }
+
+  const paidMembershipIds = new Set(
+    (confirmedPayments ?? []).map((payment) => payment.membership_id).filter((id): id is number => typeof id === "number")
+  );
+
+  return pendingMembershipsByUser
+    .filter((option) => !paidMembershipIds.has(option.membershipId))
+    .map((option) => ({
+      id: option.profile.id,
+      name: `${option.profile.first_name} ${option.profile.last_name}`.trim(),
+      planPrice: option.planPrice,
+    }));
 }
 
 

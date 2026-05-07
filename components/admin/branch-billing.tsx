@@ -4,11 +4,9 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Check,
-  CreditCard,
   DollarSign,
   AlertTriangle,
   Clock,
-  Plus,
   X,
 } from "lucide-react";
 import { motion } from "motion/react";
@@ -30,148 +28,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { BranchBillingData, BillingMemberOption } from "@/lib/branch-admin/data";
-import {
-  confirmBranchPayment,
-  recordBranchPayment,
-} from "@/app/(branch)/branch/billing/actions";
-
-// ── Confirm Payment Modal ──
-
-function ConfirmModal({
-  paymentId,
-  memberName,
-  amount,
-  onClose,
-}: {
-  paymentId: number;
-  memberName: string;
-  amount: string;
-  onClose: () => void;
-}) {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
-  const [error, setError] = useState("");
-  const [method, setMethod] = useState<"CASH" | "GCASH">("CASH");
-  const [referenceNumber, setReferenceNumber] = useState("");
-
-  function handleSubmit() {
-    startTransition(async () => {
-      setError("");
-      const result = await confirmBranchPayment({
-        paymentId,
-        method,
-        referenceNumber: method === "GCASH" ? referenceNumber.trim() || undefined : undefined,
-      });
-      if (result.error) {
-        setError(result.error);
-        return;
-      }
-      onClose();
-      router.refresh();
-    });
-  }
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4"
-      role="dialog"
-      aria-modal="true"
-    >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-lg overflow-hidden rounded-[32px] border border-border bg-card shadow-2xl"
-      >
-        <div className="flex items-center justify-between border-b border-border/50 bg-secondary/30 px-8 py-6">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-              Payment Confirmation
-            </p>
-            <h2 className="mt-1 font-display text-2xl font-black uppercase tracking-tight text-foreground">
-              Confirm Payment
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isPending}
-            className="flex size-8 items-center justify-center rounded-full bg-background/50 text-muted-foreground hover:bg-foreground hover:text-background transition-colors"
-            aria-label="Close dialog"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
-
-        <div className="p-8 space-y-6">
-          <div className="rounded-2xl border border-border bg-secondary/20 p-5 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-foreground">{memberName}</span>
-              <span className="text-sm font-bold text-foreground">{amount}</span>
-            </div>
-          </div>
-
-          <div className="space-y-2.5">
-            <Label htmlFor="confirm-method" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-              Payment Method
-            </Label>
-            <Select
-              id="confirm-method"
-              value={method}
-              onChange={(e) => setMethod(e.target.value as "CASH" | "GCASH")}
-              className="h-12 rounded-2xl bg-secondary/20"
-              disabled={isPending}
-            >
-              <option value="CASH">Cash</option>
-              <option value="GCASH">GCash</option>
-            </Select>
-          </div>
-
-          {method === "GCASH" && (
-            <div className="space-y-2.5">
-              <Label htmlFor="confirm-ref" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                Reference Number
-              </Label>
-              <Input
-                id="confirm-ref"
-                value={referenceNumber}
-                onChange={(e) => setReferenceNumber(e.target.value)}
-                placeholder="e.g. 1234567890"
-                className="h-12 rounded-2xl bg-secondary/20"
-                disabled={isPending}
-              />
-            </div>
-          )}
-
-          {error && (
-            <p className="text-sm font-medium text-destructive bg-destructive/10 px-4 py-3 rounded-xl">
-              {error}
-            </p>
-          )}
-
-          <div className="mt-8 flex items-center justify-end gap-3 pt-4 border-t border-border/50">
-            <Button
-              type="button"
-              variant="ghost"
-              className="h-12 rounded-2xl px-6 text-xs font-bold uppercase tracking-[0.16em] hover:bg-secondary/50"
-              onClick={onClose}
-              disabled={isPending}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              className="h-12 rounded-2xl px-8 text-xs font-bold uppercase tracking-[0.16em]"
-              onClick={handleSubmit}
-              disabled={isPending}
-            >
-              {isPending ? "Confirming..." : "Confirm Payment"}
-            </Button>
-          </div>
-        </div>
-      </motion.div>
-    </div>
-  );
-}
+import { recordBranchPayment } from "@/app/(branch)/branch/billing/actions";
 
 // ── Record Payment Modal ──
 
@@ -193,6 +50,7 @@ function RecordPaymentModal({
   const [referenceNumber, setReferenceNumber] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  const hasPayableMembers = members.length > 0;
   const filteredMembers = search.trim().length > 0
     ? members.filter((m) => m.name.toLowerCase().includes(search.toLowerCase())).slice(0, 8)
     : [];
@@ -316,7 +174,17 @@ function RecordPaymentModal({
                   ))}
                 </div>
               )}
+              {isDropdownOpen && hasPayableMembers && search.trim().length > 0 && filteredMembers.length === 0 && (
+                <div className="absolute top-full left-0 right-0 z-20 mt-2 rounded-2xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground shadow-xl">
+                  No pending unpaid membership found for this name.
+                </div>
+              )}
             </div>
+            {!hasPayableMembers && (
+              <p className="rounded-2xl border border-dashed border-border p-4 text-sm text-muted-foreground">
+                No members currently need payment. Active or already-paid memberships do not appear here.
+              </p>
+            )}
           </div>
 
           {/* Amount */}
@@ -427,11 +295,6 @@ export function BranchBillingPage({
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [methodFilter, setMethodFilter] = useState("All");
-  const [confirmingPayment, setConfirmingPayment] = useState<{
-    id: number;
-    member: string;
-    amount: string;
-  } | null>(null);
   const [showRecordModal, setShowRecordModal] = useState(false);
 
   const filteredRows = data.rows.filter((row) => {
@@ -451,7 +314,7 @@ export function BranchBillingPage({
 
   const metrics = [
     {
-      label: "Confirmed this month",
+      label: "Collected this month",
       value: data.confirmedThisMonth.toLocaleString(),
       icon: Check,
     },
@@ -466,7 +329,7 @@ export function BranchBillingPage({
       icon: AlertTriangle,
     },
     {
-      label: "Total collected",
+      label: "Total collected here",
       value: `PHP ${data.totalCollected.toLocaleString()}`,
       icon: DollarSign,
     },
@@ -554,7 +417,6 @@ export function BranchBillingPage({
                       <TableHead>Method</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -592,26 +454,6 @@ export function BranchBillingPage({
                             {row.status}
                           </Badge>
                         </TableCell>
-                        <TableCell>
-                          {row.status === "PENDING" ? (
-                            <Button
-                              size="sm"
-                              className="h-8 rounded-full px-4 text-[10px] font-semibold uppercase tracking-[0.14em]"
-                              onClick={() =>
-                                setConfirmingPayment({
-                                  id: row.id,
-                                  member: row.member,
-                                  amount: row.amount,
-                                })
-                              }
-                            >
-                              <Check className="mr-1 size-3" />
-                              Confirm
-                            </Button>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -621,16 +463,6 @@ export function BranchBillingPage({
           </CardContent>
         </Card>
       </div>
-
-      {/* Confirm payment modal */}
-      {confirmingPayment && (
-        <ConfirmModal
-          paymentId={confirmingPayment.id}
-          memberName={confirmingPayment.member}
-          amount={confirmingPayment.amount}
-          onClose={() => setConfirmingPayment(null)}
-        />
-      )}
 
       {/* Record payment modal */}
       {showRecordModal && (

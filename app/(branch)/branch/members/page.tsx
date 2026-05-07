@@ -64,7 +64,7 @@ async function getPendingWalkups() {
 export default async function MembersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ memberId?: string }>;
+  searchParams: Promise<{ memberId?: string; edit?: string }>;
 }) {
   const supabase = await createClient();
   const {
@@ -93,6 +93,7 @@ export default async function MembersPage({
       data={data}
       pendingWalkups={pendingWalkups}
       memberDetails={memberDetails}
+      editMode={params.edit === "1"}
     />
   );
 }

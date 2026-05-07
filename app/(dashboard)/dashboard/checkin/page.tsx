@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { CheckInPage } from "@/components/member/checkin-page";
+import { pickCurrentMembership } from "@/lib/member-membership";
 
 export default async function CheckInRoute() {
   const supabase = await createClient();
@@ -14,14 +15,15 @@ export default async function CheckInRoute() {
     .eq("id", user!.id)
     .single();
 
-  // Latest membership
-  const { data: membership } = await supabase
+  // Current membership
+  const { data: memberships } = await supabase
     .from("memberships")
-    .select("status, end_date")
+    .select("status, end_date, created_at")
     .eq("user_id", user!.id)
     .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(10);
+
+  const membership = pickCurrentMembership(memberships ?? []);
 
   // Last attendance
   const { data: lastCheckin } = await supabase

@@ -257,6 +257,40 @@ svg.noise-filter {
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+
+  .fitness-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: #8F8B84 #141414;
+    scrollbar-gutter: stable;
+  }
+
+  .fitness-scroll::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .fitness-scroll::-webkit-scrollbar-track {
+    background: #141414;
+  }
+
+  .fitness-scroll::-webkit-scrollbar-thumb {
+    background: #8F8B84;
+    border: 2px solid #141414;
+    border-radius: 999px;
+  }
+
+  .fitness-scroll::-webkit-scrollbar-thumb:hover {
+    background: #C9973E;
+  }
+
+  .fitness-scroll::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  .fitness-scroll::-webkit-scrollbar-corner {
+    background: #141414;
+  }
 }
 
 /* Marquee auto-scroll animation */

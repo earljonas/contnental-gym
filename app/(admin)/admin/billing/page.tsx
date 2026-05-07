@@ -1,6 +1,7 @@
 import { ResourcePage } from "@/components/admin/resource-page";
 import { RevenueOutstandingChart } from "@/components/admin/data-charts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getBillingMemberOptions } from "@/lib/branch-admin/data";
 import { getSuperAdminOverview } from "@/lib/super-admin/data";
 import { createClient } from "@/lib/supabase/server";
 import { confirmPayment } from "./actions";
@@ -10,17 +11,13 @@ export default async function BillingPage() {
   const overview = await getSuperAdminOverview();
   const supabase = await createClient();
 
-  // Fetch members for the record payment dialog
-  const { data: profiles } = await supabase
-    .from("profiles")
-    .select("id, first_name, last_name")
-    .eq("role", "MEMBER")
-    .order("first_name");
-
-  const memberOptions = (profiles ?? []).map((p) => ({
-    id: p.id as string,
-    name: `${p.first_name} ${p.last_name}`.trim(),
-  }));
+  const [memberOptions, { data: branches }] = await Promise.all([
+    getBillingMemberOptions(0),
+    supabase
+      .from("branches")
+      .select("id, name")
+      .order("name"),
+  ]);
 
   return (
     <ResourcePage
@@ -32,14 +29,14 @@ export default async function BillingPage() {
         { label: "Overdue", value: overview.payments.filter((item) => item.status === "Overdue").length.toString() },
         { label: "Tracked payments", value: overview.payments.length.toString() },
       ]}
-      headerAction={<RecordPaymentButton members={memberOptions} />}
+      headerAction={<RecordPaymentButton members={memberOptions} branches={branches ?? []} />}
       tableTitle="Transactions"
       columns={[
         { header: "Member", key: "member" },
-        { header: "Branch", key: "branch" },
+        { header: "Collected At", key: "branch" },
         { header: "Amount", key: "amount" },
         { header: "Method", key: "method" },
-        { header: "Due date", key: "dueDate" },
+        { header: "Date", key: "dueDate" },
         { header: "Status", key: "status", cellType: "status" },
         { header: "Action", cellType: "payment-action" },
       ]}

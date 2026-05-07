@@ -20,12 +20,13 @@ export async function manualCheckInFromMembers(memberId: string) {
 
     const { data: targetProfile } = await supabase
       .from("profiles")
-      .select("branch_id")
+      .select("id, role")
       .eq("id", memberId)
+      .eq("role", "MEMBER")
       .single();
 
-    if (!targetProfile || targetProfile.branch_id !== roleInfo.branch_id) {
-      return { error: "Member does not belong to your branch" };
+    if (!targetProfile) {
+      return { error: "Member not found" };
     }
 
     // Verify member has active membership
@@ -38,6 +39,29 @@ export async function manualCheckInFromMembers(memberId: string) {
 
     if (!memberships || memberships.length === 0) {
       return { error: "Member does not have an active membership" };
+    }
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const { data: existingCheckIn, error: existingCheckInError } = await supabase
+      .from("attendance")
+      .select("id")
+      .eq("user_id", memberId)
+      .gte("check_in_time", todayStart.toISOString())
+      .lte("check_in_time", todayEnd.toISOString())
+      .limit(1)
+      .maybeSingle();
+
+    if (existingCheckInError) {
+      console.error("[manualCheckInFromMembers] duplicate check failed:", existingCheckInError);
+      return { error: "Failed to verify today's check-in" };
+    }
+
+    if (existingCheckIn) {
+      return { error: "Already checked in today" };
     }
 
     const { error: insertError } = await supabase.from("attendance").insert({
@@ -57,6 +81,56 @@ export async function manualCheckInFromMembers(memberId: string) {
     return { success: true };
   } catch (err) {
     console.error("[manualCheckInFromMembers] Unexpected error:", err);
+    return { error: "Unexpected error occurred" };
+  }
+}
+
+export async function updateBranchMemberProfile(data: {
+  memberId: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+}) {
+  try {
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { error: "Not authenticated" };
+
+    const roleInfo = await getUserRole(supabase, user.id);
+    if (roleInfo.role !== "BRANCH_ADMIN" || !roleInfo.branch_id) {
+      return { error: "Unauthorized" };
+    }
+
+    const firstName = data.firstName.trim();
+    const lastName = data.lastName.trim();
+    const phone = data.phone?.trim() || null;
+
+    if (!firstName || !lastName) {
+      return { error: "First name and last name are required" };
+    }
+
+    const { data: updated, error } = await supabase.rpc(
+      "branch_admin_update_member_profile",
+      {
+        member_id: data.memberId,
+        new_first_name: firstName,
+        new_last_name: lastName,
+        new_phone: phone,
+      }
+    );
+
+    if (error || updated !== true) {
+      console.error("[updateBranchMemberProfile] update failed:", error);
+      return { error: "Failed to update member" };
+    }
+
+    revalidatePath("/branch/members");
+    return { success: true };
+  } catch (err) {
+    console.error("[updateBranchMemberProfile] Unexpected error:", err);
     return { error: "Unexpected error occurred" };
   }
 }
