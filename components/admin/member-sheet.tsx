@@ -1,107 +1,316 @@
 "use client";
 
-import { useTransition } from "react";
+import { useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  Activity,
+  CalendarDays,
+  CreditCard,
+  Mail,
+  Phone,
+  Shield,
+  X,
+} from "lucide-react";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toggleMemberStatus } from "@/app/(admin)/admin/members/actions";
 
-export function MemberSheet({ details }: { details: any }) {
+type MemberDetails = {
+  profile: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone?: string | null;
+    avatar_url?: string | null;
+    role: string;
+    created_at?: string | null;
+  } | null;
+  memberships: {
+    id: number;
+    status: string;
+    start_date?: string | null;
+    created_at: string;
+    end_date: string | null;
+    membership_plans?: { name?: string | null } | { name?: string | null }[] | null;
+  }[];
+  payments: {
+    id: number;
+    amount: number | string;
+    status: string;
+    payment_method: string;
+    created_at: string;
+  }[];
+  attendance: {
+    id: number;
+    check_in_time: string;
+    branches?: { name?: string | null } | { name?: string | null }[] | null;
+  }[];
+};
+
+function formatDate(date: string | null | undefined) {
+  if (!date) return "Not set";
+  return new Date(date).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function statusBadgeClass(status: string) {
+  switch (status) {
+    case "ACTIVE":
+      return "badge-active";
+    case "PENDING":
+      return "badge-pending";
+    case "EXPIRED":
+    case "CANCELLED":
+      return "badge-expired";
+    default:
+      return "";
+  }
+}
+
+function planName(
+  plan: MemberDetails["memberships"][number]["membership_plans"]
+) {
+  return (Array.isArray(plan) ? plan[0] : plan)?.name ?? "Unknown Plan";
+}
+
+export function MemberSheet({ details }: { details: MemberDetails }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  const handleOpenChange = (open: boolean) => {
-    if (!open) {
-      router.push("/admin/members"); // Close by wiping URL param
-    }
-  };
+  function closeModal() {
+    router.push("/admin/members");
+  }
 
-  const handleToggle = () => {
+  function handleToggle() {
+    if (!details.profile) return;
+    const memberId = details.profile.id;
+
     startTransition(async () => {
-      // Find current status from memberships array
-      const currentStatus = details.memberships[0]?.status || "CANCELLED";
-      await toggleMemberStatus(details.profile.id, currentStatus);
+      await toggleMemberStatus(memberId, details.memberships[0]?.status ?? "NONE");
+      router.refresh();
     });
-  };
+  }
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        closeModal();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  });
 
   if (!details || !details.profile) return null;
 
-  const currentStatus = details.memberships[0]?.status === "ACTIVE" ? "Active" : "Suspended";
+  const profile = details.profile;
+  const currentMembership = details.memberships[0] ?? null;
+  const currentStatus = currentMembership?.status ?? "NONE";
+  const currentPlan = currentMembership ? planName(currentMembership.membership_plans) : "No plan";
+  const initials = `${profile.first_name[0] ?? ""}${profile.last_name[0] ?? ""}`.toUpperCase();
 
   return (
-    <Sheet open={true} onOpenChange={handleOpenChange}>
-      <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto bg-background/95 backdrop-blur-xl border-border">
-        <SheetHeader className="mb-6">
-          <div className="flex items-start justify-between">
-            <div>
-              <SheetTitle className="text-2xl font-bold uppercase tracking-tight">
-                {details.profile.first_name} {details.profile.last_name}
-              </SheetTitle>
-              <SheetDescription className="text-muted-foreground mt-1 text-sm">
-                {details.profile.email} &mdash; {details.profile.role}
-              </SheetDescription>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm"
+      onClick={closeModal}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="super-member-detail-title"
+        className="relative flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-border bg-background"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-border bg-card p-6">
+          <div className="flex min-w-0 items-start gap-4">
+            <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-border bg-secondary text-xl font-black uppercase text-foreground">
+              {profile.avatar_url ? (
+                <span
+                  className="size-full bg-cover bg-center"
+                  style={{ backgroundImage: `url(${profile.avatar_url})` }}
+                  aria-hidden="true"
+                />
+              ) : (
+                initials
+              )}
             </div>
-            <Badge variant={currentStatus === "Active" ? "secondary" : "danger"}>
-              {currentStatus}
-            </Badge>
-          </div>
-        </SheetHeader>
-
-        <div className="space-y-6">
-          {/* Status Toggle Action */}
-          <div className="rounded-xl border border-border bg-secondary/30 p-4 flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold capitalize tracking-wide">Account Status</p>
-              <p className="text-xs text-muted-foreground">Suspend or reactivate this member.</p>
-            </div>
-            <Button
-              variant={currentStatus === "Active" ? "destructive" : "default"}
-              size="sm"
-              disabled={isPending}
-              onClick={handleToggle}
-              className="text-xs font-semibold uppercase tracking-widest"
-            >
-              {isPending ? "Syncing..." : currentStatus === "Active" ? "Suspend" : "Activate"}
-            </Button>
-          </div>
-
-          {/* Memberships */}
-          <div>
-            <h4 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3 border-b border-border pb-2">Membership History</h4>
-            <div className="space-y-2">
-              {details.memberships.map((m: any) => (
-                <div key={m.id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/20">
-                  <div>
-                    <span className="text-sm font-semibold text-foreground">{m.membership_plans?.name || 'Unknown Plan'}</span>
-                    <p className="text-xs text-muted-foreground">Term: {new Date(m.created_at).toLocaleDateString()} - {m.end_date ? new Date(m.end_date).toLocaleDateString() : 'Active'}</p>
-                  </div>
-                  <Badge variant="outline">{m.status}</Badge>
-                </div>
-              ))}
-              {details.memberships.length === 0 && <p className="text-sm text-muted-foreground">No records found.</p>}
+            <div className="min-w-0">
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <h2
+                  id="super-member-detail-title"
+                  className="font-display text-3xl font-black uppercase leading-none tracking-tight text-foreground md:text-4xl"
+                >
+                  {profile.first_name} {profile.last_name}
+                </h2>
+                <Badge variant="secondary" className={statusBadgeClass(currentStatus)}>
+                  {currentStatus}
+                </Badge>
+              </div>
+              <div className="flex flex-col gap-1 text-sm text-muted-foreground sm:flex-row sm:flex-wrap sm:gap-x-4">
+                <span className="flex items-center gap-2">
+                  <Mail className="size-4" />
+                  {profile.email}
+                </span>
+                <span className="flex items-center gap-2">
+                  <Phone className="size-4" />
+                  {profile.phone || "No phone number"}
+                </span>
+              </div>
             </div>
           </div>
-
-          {/* Payments */}
-          <div>
-            <h4 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3 border-b border-border pb-2">Recent Payments</h4>
-            <div className="space-y-2">
-              {details.payments.map((p: any) => (
-                <div key={p.id} className="flex items-center justify-between p-3 rounded-lg bg-secondary/20">
-                  <div>
-                    <span className="text-sm font-semibold text-foreground">PHP {p.amount}</span>
-                    <p className="text-xs text-muted-foreground">via {p.payment_method} &bull; {new Date(p.created_at).toLocaleDateString()}</p>
-                  </div>
-                  <Badge variant={p.status === "CONFIRMED" ? "secondary" : "outline"}>{p.status}</Badge>
-                </div>
-              ))}
-              {details.payments.length === 0 && <p className="text-sm text-muted-foreground">No records found.</p>}
-            </div>
-          </div>
-
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            className="rounded-xl"
+            onClick={closeModal}
+            aria-label="Close member details"
+          >
+            <X className="size-4" />
+          </Button>
         </div>
-      </SheetContent>
-    </Sheet>
+
+        <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[320px_1fr]">
+          <aside className="space-y-4 border-b border-border bg-card/50 p-6 lg:border-b-0 lg:border-r">
+            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+              <div className="rounded-2xl border border-border bg-card p-4">
+                <CalendarDays className="mb-3 size-4 text-muted-foreground" />
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                  Joined
+                </p>
+                <p className="mt-1 text-sm font-bold text-foreground">{formatDate(profile.created_at)}</p>
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-4">
+                <Activity className="mb-3 size-4 text-muted-foreground" />
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                  Check-ins
+                </p>
+                <p className="mt-1 text-sm font-bold text-foreground">{details.attendance.length}</p>
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-4">
+                <Shield className="mb-3 size-4 text-muted-foreground" />
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                  Current Plan
+                </p>
+                <p className="mt-1 truncate text-sm font-bold text-foreground">{currentPlan}</p>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-card p-5">
+              <h3 className="font-display text-xl font-black uppercase tracking-tight text-foreground">
+                Account Status
+              </h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Suspend or reactivate this member.
+              </p>
+              <Button
+                type="button"
+                variant={currentStatus === "ACTIVE" ? "destructive" : "default"}
+                className="mt-5 h-10 w-full rounded-xl text-xs font-bold uppercase tracking-[0.16em]"
+                disabled={isPending || currentStatus === "NONE"}
+                onClick={handleToggle}
+              >
+                {isPending ? "Syncing..." : currentStatus === "ACTIVE" ? "Suspend" : "Activate"}
+              </Button>
+            </div>
+          </aside>
+
+          <div className="space-y-6 p-6">
+            <section className="rounded-2xl border border-border bg-card">
+              <h4 className="border-b border-border px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                Membership History
+              </h4>
+              <div className="divide-y divide-border">
+                {details.memberships.map((membership) => (
+                  <div key={membership.id} className="flex items-center justify-between gap-4 p-5">
+                    <div className="min-w-0">
+                      <span className="text-sm font-bold text-foreground">
+                        {planName(membership.membership_plans)}
+                      </span>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDate(membership.start_date ?? membership.created_at)} to{" "}
+                        {membership.end_date ? formatDate(membership.end_date) : "Ongoing"}
+                      </p>
+                    </div>
+                    <Badge variant="outline" className={statusBadgeClass(membership.status)}>
+                      {membership.status}
+                    </Badge>
+                  </div>
+                ))}
+                {details.memberships.length === 0 ? (
+                  <p className="p-5 text-sm text-muted-foreground">No records found.</p>
+                ) : null}
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-border bg-card">
+              <h4 className="border-b border-border px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                Recent Payments
+              </h4>
+              <div className="divide-y divide-border">
+                {details.payments.map((payment) => (
+                  <div key={payment.id} className="flex items-center justify-between gap-4 p-5">
+                    <div className="min-w-0">
+                      <span className="flex items-center gap-2 text-sm font-bold text-foreground">
+                        <CreditCard className="size-4 text-muted-foreground" />
+                        PHP {Number(payment.amount).toLocaleString()}
+                      </span>
+                      <p className="text-xs text-muted-foreground">
+                        via {payment.payment_method} on {formatDate(payment.created_at)}
+                      </p>
+                    </div>
+                    <Badge variant="secondary" className={payment.status === "CONFIRMED" ? "badge-active" : "badge-pending"}>
+                      {payment.status}
+                    </Badge>
+                  </div>
+                ))}
+                {details.payments.length === 0 ? (
+                  <p className="p-5 text-sm text-muted-foreground">No records found.</p>
+                ) : null}
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-border bg-card">
+              <h4 className="border-b border-border px-5 py-4 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                Attendance Log
+              </h4>
+              <div className="divide-y divide-border">
+                {details.attendance.map((attendance) => {
+                  const branch = Array.isArray(attendance.branches)
+                    ? attendance.branches[0]
+                    : attendance.branches;
+
+                  return (
+                    <div key={attendance.id} className="flex items-center justify-between gap-4 p-5">
+                      <div>
+                        <span className="text-sm font-semibold text-foreground">
+                          {formatDate(attendance.check_in_time)}
+                        </span>
+                        <p className="text-xs text-muted-foreground">{branch?.name ?? "Branch"}</p>
+                      </div>
+                      <span className="text-sm text-muted-foreground">
+                        {new Date(attendance.check_in_time).toLocaleTimeString("en-US", {
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    </div>
+                  );
+                })}
+                {details.attendance.length === 0 ? (
+                  <p className="p-5 text-sm text-muted-foreground">No records found.</p>
+                ) : null}
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

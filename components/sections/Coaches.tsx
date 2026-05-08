@@ -83,7 +83,7 @@ export function Coaches() {
               <div className="relative aspect-[3/4] overflow-hidden rounded-2xl mb-6 bg-[#1A1A1A] border border-border-subtle">
                 <div
                   className="absolute inset-0 transition-transform duration-500 origin-center"
-                  style={{ transform: (coach as any).scale ? `scale(${(coach as any).scale})` : undefined }}
+                  style={{ transform: coach.scale ? `scale(${coach.scale})` : undefined }}
                 >
                   <Image
                     src={coach.image}

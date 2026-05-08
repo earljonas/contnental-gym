@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Dumbbell,
   CalendarCheck,
+  Megaphone,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,12 @@ interface MemberHomeProps {
   weeklyGoal: number;
   weekDays: WeekDay[];
   streak: number;
+  announcements: {
+    id: number;
+    title: string;
+    body: string;
+    publishAt: string;
+  }[];
 }
 
 /* ─── Helpers ─── */
@@ -125,6 +132,7 @@ export function MemberHome({
   weeklyGoal,
   weekDays,
   streak,
+  announcements,
 }: MemberHomeProps) {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
@@ -201,6 +209,30 @@ export function MemberHome({
       </div>
 
       {/* ═══ EXPIRED / PENDING WARNING BANNER ═══ */}
+      {announcements.length > 0 ? (
+        <div className="overflow-hidden rounded-2xl border border-border bg-card">
+          <div className="flex items-center gap-2 border-b border-border px-5 py-3">
+            <Megaphone className="size-4 text-[#C9973E]" />
+            <span className="text-[11px] font-medium uppercase tracking-[0.15em] text-muted-foreground">
+              Announcements
+            </span>
+          </div>
+          <div className="divide-y divide-border">
+            {announcements.map((announcement) => (
+              <div key={announcement.id} className="px-5 py-4">
+                <div className="flex items-start justify-between gap-4">
+                  <p className="text-sm font-semibold text-foreground">{announcement.title}</p>
+                  <span className="shrink-0 text-[11px] text-muted-foreground">
+                    {announcement.publishAt}
+                  </span>
+                </div>
+                <p className="mt-1 text-[13px] text-muted-foreground">{announcement.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       {membershipStatus === "EXPIRED" && (
         <div className="flex items-center justify-between rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3">
           <div>

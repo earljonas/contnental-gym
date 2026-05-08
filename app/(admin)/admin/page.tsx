@@ -9,6 +9,7 @@ export default async function AdminPage() {
       metrics={overview.metrics}
       revenueTrend={overview.revenueTrend}
       checkInTrend={overview.checkInTrend}
+      branchRevenue={overview.branchRevenue}
       planDistribution={overview.planDistribution}
       recentActivity={overview.recentActivity}
       payments={overview.payments}

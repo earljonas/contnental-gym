@@ -2,20 +2,49 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getUserRole } from "@/lib/supabase/roles";
+
+async function requireSuperAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Not authenticated" as const };
+  }
+
+  const roleInfo = await getUserRole(supabase, user.id);
+  if (roleInfo.role !== "SUPER_ADMIN") {
+    return { error: "Unauthorized" as const };
+  }
+
+  return { error: null };
+}
 
 export async function toggleMemberStatus(memberId: string, currentStatus: string) {
   try {
     const supabase = await createClient();
+    const auth = await requireSuperAdmin(supabase);
+    if (auth.error) return { error: auth.error };
 
-    const targetStatus = currentStatus === "Active" ? "CANCELLED" : "ACTIVE";
+    const targetStatus = currentStatus === "Active" || currentStatus === "ACTIVE" ? "CANCELLED" : "ACTIVE";
 
-    // Update the latest membership for this user to toggle their status
+    const { data: membership } = await supabase
+      .from("memberships")
+      .select("id")
+      .eq("user_id", memberId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!membership) {
+      return { error: "Membership not found" };
+    }
+
     const { error } = await supabase
       .from("memberships")
       .update({ status: targetStatus })
-      .eq("user_id", memberId)
-      .order("created_at", { ascending: false })
-      .limit(1);
+      .eq("id", membership.id);
 
     if (error) {
       console.error("[toggleMemberStatus] Error:", error);
@@ -32,11 +61,13 @@ export async function toggleMemberStatus(memberId: string, currentStatus: string
 
 export async function getMemberDetails(memberId: string) {
   const supabase = await createClient();
+  const auth = await requireSuperAdmin(supabase);
+  if (auth.error) return null;
 
   // Basic profile
   const { data: profile } = await supabase
     .from("profiles")
-    .select("first_name, last_name, email, role")
+    .select("id, first_name, last_name, email, phone, avatar_url, role, created_at")
     .eq("id", memberId)
     .single();
 
@@ -44,7 +75,7 @@ export async function getMemberDetails(memberId: string) {
   const { data: memberships } = await supabase
     .from("memberships")
     .select(`
-      id, status, created_at, end_date,
+      id, status, start_date, created_at, end_date,
       membership_plans ( name, tier )
     `)
     .eq("user_id", memberId)

@@ -1,6 +1,5 @@
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { AdminPageTransition } from "@/components/admin/page-transition";
-import { Button } from "@/components/ui/button";
 import { ResourceTable } from "@/components/admin/resource-table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -16,7 +15,7 @@ type Column<T> = {
   cellType?: "text" | "status" | "email-action" | "payment-action" | "member-view";
 };
 
-export function ResourcePage<T extends Record<string, any>>({
+export function ResourcePage<T extends Record<string, unknown>>({
   title,
   actionLabel,
   summary,
@@ -31,7 +30,7 @@ export function ResourcePage<T extends Record<string, any>>({
   charts,
   headerAction,
   onPaymentConfirm,
-  onMemberView,
+  memberViewPath,
 }: {
   title: string;
   actionLabel?: string;
@@ -50,14 +49,13 @@ export function ResourcePage<T extends Record<string, any>>({
   dateKey?: keyof T;
   charts?: React.ReactNode;
   headerAction?: React.ReactNode;
-  onPaymentConfirm?: (id: number) => Promise<any>;
-  onMemberView?: (id: string | number) => void;
+  onPaymentConfirm?: (id: number) => Promise<unknown>;
+  memberViewPath?: string;
 }) {
   return (
     <AdminPageTransition>
       <div className="space-y-8">
-        <AdminPageHeader title={title} actionLabel={actionLabel} />
-        {headerAction}
+        <AdminPageHeader title={title} actionLabel={actionLabel} action={headerAction} />
 
         {summary && summary.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -96,11 +94,8 @@ export function ResourcePage<T extends Record<string, any>>({
         {charts ? <div className="grid gap-6">{charts}</div> : null}
 
         <Card className="rounded-[30px]">
-          <CardHeader className="flex-col gap-4 border-b border-border/70 p-6 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+          <CardHeader className="border-b border-border/70 p-6">
             <CardTitle>{tableTitle}</CardTitle>
-            <Button variant="outline" className="h-11 rounded-2xl px-5 text-xs font-semibold uppercase tracking-[0.16em]" disabled title="Coming soon">
-              Export
-            </Button>
           </CardHeader>
           <CardContent className="p-6">
             <ResourceTable
@@ -111,7 +106,7 @@ export function ResourcePage<T extends Record<string, any>>({
               filters={filters}
               dateKey={dateKey}
               onPaymentConfirm={onPaymentConfirm}
-              onMemberView={onMemberView}
+              memberViewPath={memberViewPath}
             />
           </CardContent>
         </Card>

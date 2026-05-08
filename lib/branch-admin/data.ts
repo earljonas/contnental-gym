@@ -17,6 +17,13 @@ export type PendingMember = {
   registeredDate: string;
 };
 
+export type BranchPlanOption = {
+  id: number;
+  name: string;
+  price: number;
+  duration: number;
+};
+
 export type BranchDashboardData = {
   totalMembers: number;
   activeMembers: number;
@@ -310,6 +317,28 @@ export async function getSearchableMembers(branchId: number): Promise<Searchable
   }));
 }
 
+export async function getBranchPlanOptions(): Promise<BranchPlanOption[]> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("membership_plans")
+    .select("id, name, price, duration")
+    .eq("is_active", true)
+    .order("duration", { ascending: true });
+
+  if (error) {
+    console.error("[getBranchPlanOptions] plans error:", error);
+    return [];
+  }
+
+  return (data ?? []).map((plan) => ({
+    id: plan.id,
+    name: plan.name,
+    price: Number(plan.price),
+    duration: Number(plan.duration),
+  }));
+}
+
 // ── Members page types & data ──
 
 export type MemberRow = {
@@ -560,6 +589,9 @@ export type BillingMemberOption = {
   id: string;
   name: string;
   planPrice: number;
+  planName: string;
+  paymentState: "PAYABLE" | "ALREADY_PAID" | "NO_MEMBERSHIP" | "NO_PENDING_MEMBERSHIP";
+  note: string;
 };
 
 type BillingMemberProfileRow = {
@@ -574,7 +606,7 @@ type BillingMemberMembershipRow = {
   status: string;
   created_at: string | null;
   end_date?: string | null;
-  membership_plans: { price?: number | null } | null;
+  membership_plans: { name?: string | null; price?: number | null } | null;
 };
 
 export async function getBranchBilling(branchId: number): Promise<BranchBillingData> {
@@ -663,7 +695,7 @@ export async function getBillingMemberOptions(
   const supabase = await createClient();
   void branchId;
 
-  const [profilesResult, membershipsResult] = await Promise.all([
+  const [profilesResult, membershipsResult, paymentsResult] = await Promise.all([
     supabase
       .from("profiles")
       .select("id, first_name, last_name")
@@ -671,8 +703,12 @@ export async function getBillingMemberOptions(
       .order("first_name"),
     supabase
       .from("memberships")
-      .select("id, user_id, status, created_at, end_date, membership_plans(price)")
+      .select("id, user_id, status, created_at, end_date, membership_plans(name, price)")
       .order("created_at", { ascending: false }),
+    supabase
+      .from("payments")
+      .select("membership_id")
+      .eq("status", "CONFIRMED"),
   ]);
 
   if (profilesResult.error) {
@@ -680,6 +716,9 @@ export async function getBillingMemberOptions(
   }
   if (membershipsResult.error) {
     console.error("[getBillingMemberOptions] memberships error:", membershipsResult.error);
+  }
+  if (paymentsResult.error) {
+    console.error("[getBillingMemberOptions] payments error:", paymentsResult.error);
   }
 
   const profiles = (profilesResult.data ?? []) as BillingMemberProfileRow[];
@@ -690,58 +729,62 @@ export async function getBillingMemberOptions(
     membershipsByUser.set(membership.user_id, userMemberships);
   }
 
-  const pendingMembershipsByUser = profiles
-    .map((profile) => {
-      const memberships = membershipsByUser.get(profile.id) ?? [];
-      const latestMembership = pickCurrentMembership(memberships);
-      const latestPlan = latestMembership?.membership_plans as unknown as { price: number } | null;
-
-      if (!latestMembership || latestMembership.status !== "PENDING") {
-        return null;
-      }
-
-      return {
-        profile,
-        membershipId: latestMembership.id,
-        planPrice: latestPlan?.price ?? 0,
-      };
-    })
-    .filter(
-      (
-        option
-      ): option is {
-        profile: BillingMemberProfileRow;
-        membershipId: number;
-        planPrice: number;
-      } => option !== null
-    );
-
-  const membershipIds = pendingMembershipsByUser.map((option) => option.membershipId);
-  if (membershipIds.length === 0) {
-    return [];
-  }
-
-  const { data: confirmedPayments, error: confirmedPaymentsError } = await supabase
-    .from("payments")
-    .select("membership_id")
-    .in("membership_id", membershipIds)
-    .eq("status", "CONFIRMED");
-
-  if (confirmedPaymentsError) {
-    console.error("[getBillingMemberOptions] payments error:", confirmedPaymentsError);
-  }
-
   const paidMembershipIds = new Set(
-    (confirmedPayments ?? []).map((payment) => payment.membership_id).filter((id): id is number => typeof id === "number")
+    (paymentsResult.data ?? []).map((payment) => payment.membership_id).filter((id): id is number => typeof id === "number")
   );
 
-  return pendingMembershipsByUser
-    .filter((option) => !paidMembershipIds.has(option.membershipId))
-    .map((option) => ({
-      id: option.profile.id,
-      name: `${option.profile.first_name} ${option.profile.last_name}`.trim(),
-      planPrice: option.planPrice,
-    }));
+  return profiles.map((profile) => {
+    const memberships = membershipsByUser.get(profile.id) ?? [];
+    const latestMembership = pickCurrentMembership(memberships);
+    const latestPlan = latestMembership?.membership_plans as unknown as {
+      name?: string | null;
+      price?: number | null;
+    } | null;
+    const name = `${profile.first_name} ${profile.last_name}`.trim();
+
+    if (!latestMembership) {
+      return {
+        id: profile.id,
+        name,
+        planName: "No plan",
+        planPrice: 0,
+        paymentState: "NO_MEMBERSHIP" as const,
+        note: "No membership to pay for",
+      };
+    }
+
+    if (latestMembership.status !== "PENDING") {
+      const isAlreadyPaid = latestMembership.status === "ACTIVE";
+      return {
+        id: profile.id,
+        name,
+        planName: latestPlan?.name ?? "No plan",
+        planPrice: Number(latestPlan?.price ?? 0),
+        paymentState: "NO_PENDING_MEMBERSHIP" as const,
+        note: isAlreadyPaid ? "Member already paid" : "No pending payment",
+      };
+    }
+
+    if (paidMembershipIds.has(latestMembership.id)) {
+      return {
+        id: profile.id,
+        name,
+        planName: latestPlan?.name ?? "No plan",
+        planPrice: Number(latestPlan?.price ?? 0),
+        paymentState: "ALREADY_PAID" as const,
+        note: "Member already paid",
+      };
+    }
+
+    return {
+      id: profile.id,
+      name,
+      planName: latestPlan?.name ?? "No plan",
+      planPrice: Number(latestPlan?.price ?? 0),
+      paymentState: "PAYABLE" as const,
+      note: "Ready to record payment",
+    };
+  });
 }
 
 

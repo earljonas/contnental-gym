@@ -24,7 +24,7 @@ export default async function SuperAdminBranchesPage() {
   const [
     { data: branches, error: branchesError },
     { data: profiles, error: profilesError },
-    { data: admins, error: adminsError },
+    { data: admins },
   ] = await Promise.all([
     supabase.from("branches").select("id, name, location").order("name"),
     supabase

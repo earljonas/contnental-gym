@@ -1,12 +1,10 @@
-import { ArrowDownRight, ArrowRight, ArrowUpRight, BellDot, Sparkles } from "lucide-react";
+import { ArrowDownRight, ArrowRight, ArrowUpRight, Sparkles } from "lucide-react";
 
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { AdminPageTransition } from "@/components/admin/page-transition";
 import { DistributionBarChart, TrendLineChart } from "@/components/admin/charts";
-import { RevenueByBranchChart } from "@/components/admin/data-charts";
 import { ResourceTable } from "@/components/admin/resource-table";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type {
   ActivityRow,
@@ -34,6 +32,7 @@ export function DashboardPage({
   metrics,
   revenueTrend,
   checkInTrend,
+  branchRevenue,
   planDistribution,
   recentActivity,
   payments,
@@ -41,6 +40,7 @@ export function DashboardPage({
   metrics: DashboardMetric[];
   revenueTrend: TrendPoint[];
   checkInTrend: TrendPoint[];
+  branchRevenue: DistributionPoint[];
   planDistribution: DistributionPoint[];
   recentActivity: ActivityRow[];
   payments: PaymentRow[];
@@ -48,7 +48,7 @@ export function DashboardPage({
   return (
     <AdminPageTransition>
       <div className="space-y-8">
-        <AdminPageHeader title="Dashboard" actionLabel="Export" />
+        <AdminPageHeader title="Dashboard" />
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {metrics.map((metric) => (
@@ -111,7 +111,14 @@ export function DashboardPage({
             <Badge variant="secondary">Finance</Badge>
           </CardHeader>
           <CardContent>
-            <RevenueByBranchChart />
+            {branchRevenue.length > 0 ? (
+              <DistributionBarChart data={branchRevenue} />
+            ) : (
+              <div className="rounded-2xl border border-dashed border-border p-8 text-center md:p-12">
+                <p className="text-sm font-semibold text-foreground">No branch revenue yet</p>
+                <p className="mt-1 text-xs text-muted-foreground">Confirmed payments will appear here.</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -136,9 +143,9 @@ export function DashboardPage({
               <Sparkles className="size-5 text-amber-500" />
             </CardHeader>
             <CardContent className="space-y-4">
-              {recentActivity.map((activity) => (
+              {recentActivity.length > 0 ? recentActivity.map((activity, index) => (
                 <div
-                  key={`${activity.member}-${activity.timestamp}`}
+                  key={`${activity.member}-${activity.activity}-${activity.timestamp}-${index}`}
                   className="rounded-2xl border border-border bg-secondary/60 p-4"
                 >
                   <div className="flex items-start justify-between gap-4">
@@ -157,7 +164,12 @@ export function DashboardPage({
                     <p className="mt-3 text-sm font-semibold text-foreground">{activity.amount}</p>
                   ) : null}
                 </div>
-              ))}
+              )) : (
+                <div className="rounded-2xl border border-dashed border-border p-8 text-center">
+                  <p className="text-sm font-semibold text-foreground">No recent activity</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Payments and check-ins will appear here.</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

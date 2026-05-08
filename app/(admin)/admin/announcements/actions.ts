@@ -8,8 +8,6 @@ import { getUserRole } from "@/lib/supabase/roles";
 export async function sendAnnouncement(data: {
   title: string;
   body: string;
-  branchIds: number[];
-  allBranches: boolean;
 }) {
   try {
     const supabase = await createClient();
@@ -28,7 +26,6 @@ export async function sendAnnouncement(data: {
 
     const title = data.title.trim();
     const body = data.body.trim();
-    const uniqueBranchIds = [...new Set(data.branchIds)].sort((a, b) => a - b);
 
     if (!title) {
       return { error: "Title is required" };
@@ -36,15 +33,12 @@ export async function sendAnnouncement(data: {
     if (!body) {
       return { error: "Message is required" };
     }
-    if (!data.allBranches && uniqueBranchIds.length === 0) {
-      return { error: "Select at least one branch" };
-    }
 
     const { error } = await supabase.from("announcements").insert({
       title,
       body,
-      all_branches: data.allBranches,
-      audience_branch_ids: data.allBranches ? [] : uniqueBranchIds,
+      all_branches: true,
+      audience_branch_ids: [],
       status: "SENT",
       publish_at: new Date().toISOString(),
       created_by: user.id,

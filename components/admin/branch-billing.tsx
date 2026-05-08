@@ -50,10 +50,10 @@ function RecordPaymentModal({
   const [referenceNumber, setReferenceNumber] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const hasPayableMembers = members.length > 0;
   const filteredMembers = search.trim().length > 0
-    ? members.filter((m) => m.name.toLowerCase().includes(search.toLowerCase())).slice(0, 8)
-    : [];
+    ? members.filter((m) => m.name.toLowerCase().includes(search.toLowerCase())).slice(0, 10)
+    : members.slice(0, 10);
+  const selectedMemberCanPay = selectedMember?.paymentState === "PAYABLE";
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -72,11 +72,16 @@ function RecordPaymentModal({
     if (m.planPrice > 0) {
       setAmount(m.planPrice.toString());
     }
+    setError(m.paymentState === "PAYABLE" ? "" : m.note);
   }
 
   function handleSubmit() {
     if (!selectedMember) {
       setError("Please select a member.");
+      return;
+    }
+    if (selectedMember.paymentState !== "PAYABLE") {
+      setError(selectedMember.note);
       return;
     }
     const numAmount = Number.parseFloat(amount);
@@ -105,13 +110,13 @@ function RecordPaymentModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4"
-      role="dialog"
-      aria-modal="true"
+        role="dialog"
+        aria-modal="true"
     >
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-lg overflow-hidden rounded-[32px] border border-border bg-card shadow-2xl"
+        className="w-full max-w-lg overflow-hidden rounded-3xl border border-border bg-card"
       >
         <div className="flex items-center justify-between border-b border-border/50 bg-secondary/30 px-8 py-6">
           <div>
@@ -148,11 +153,9 @@ function RecordPaymentModal({
                   setAmount("");
                   setIsDropdownOpen(e.target.value.trim().length > 0);
                 }}
-                onFocus={() => {
-                  if (search.trim().length > 0) setIsDropdownOpen(true);
-                }}
+                onFocus={() => setIsDropdownOpen(true)}
                 placeholder="Search member name..."
-                className="h-12 rounded-2xl bg-secondary/20"
+                className="h-11 rounded-xl bg-secondary/20 focus:border-[#C9973E] focus:ring-[#C9973E]/20"
                 disabled={isPending}
               />
               {isDropdownOpen && filteredMembers.length > 0 && (
@@ -164,27 +167,25 @@ function RecordPaymentModal({
                       className="w-full px-4 py-3 text-left text-sm font-medium text-foreground transition-colors hover:bg-secondary/50 first:rounded-t-2xl last:rounded-b-2xl"
                       onClick={() => handleSelectMember(m)}
                     >
-                      <span>{m.name}</span>
-                      {m.planPrice > 0 && (
-                        <span className="ml-2 text-xs text-muted-foreground">
-                          PHP {m.planPrice.toLocaleString()}
-                        </span>
-                      )}
+                      <span className="block">{m.name}</span>
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        {m.planName} {m.planPrice > 0 ? `- PHP ${m.planPrice.toLocaleString()}` : ""} · {m.note}
+                      </span>
                     </button>
                   ))}
                 </div>
               )}
-              {isDropdownOpen && hasPayableMembers && search.trim().length > 0 && filteredMembers.length === 0 && (
+              {isDropdownOpen && search.trim().length > 0 && filteredMembers.length === 0 && (
                 <div className="absolute top-full left-0 right-0 z-20 mt-2 rounded-2xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground shadow-xl">
-                  No pending unpaid membership found for this name.
+                  No member found for this name.
                 </div>
               )}
             </div>
-            {!hasPayableMembers && (
-              <p className="rounded-2xl border border-dashed border-border p-4 text-sm text-muted-foreground">
-                No members currently need payment. Active or already-paid memberships do not appear here.
+            {selectedMember && !selectedMemberCanPay ? (
+              <p className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm font-medium text-amber-500">
+                {selectedMember.note}
               </p>
-            )}
+            ) : null}
           </div>
 
           {/* Amount */}
@@ -200,7 +201,7 @@ function RecordPaymentModal({
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0.00"
-              className="h-12 rounded-2xl bg-secondary/20"
+              className="h-11 rounded-xl bg-secondary/20 focus:border-[#C9973E] focus:ring-[#C9973E]/20"
               disabled={isPending}
             />
           </div>
@@ -214,7 +215,7 @@ function RecordPaymentModal({
               id="record-method"
               value={method}
               onChange={(e) => setMethod(e.target.value as "CASH" | "GCASH")}
-              className="h-12 rounded-2xl bg-secondary/20"
+              className="h-11 rounded-xl bg-secondary/20 focus:border-[#C9973E] focus:ring-[#C9973E]/20"
               disabled={isPending}
             >
               <option value="CASH">Cash</option>
@@ -233,7 +234,7 @@ function RecordPaymentModal({
                 value={referenceNumber}
                 onChange={(e) => setReferenceNumber(e.target.value)}
                 placeholder="e.g. GCash ref #"
-                className="h-12 rounded-2xl bg-secondary/20"
+                className="h-11 rounded-xl bg-secondary/20 focus:border-[#C9973E] focus:ring-[#C9973E]/20"
                 disabled={isPending}
               />
             </div>
@@ -257,9 +258,9 @@ function RecordPaymentModal({
             </Button>
             <Button
               type="button"
-              className="h-12 rounded-2xl px-8 text-xs font-bold uppercase tracking-[0.16em]"
+              className="h-11 rounded-xl bg-[#C9973E] px-8 text-xs font-bold uppercase tracking-[0.16em] text-black"
               onClick={handleSubmit}
-              disabled={isPending}
+              disabled={isPending || !selectedMemberCanPay}
             >
               {isPending ? "Saving..." : "Record Payment"}
             </Button>

@@ -120,7 +120,15 @@ function QrScanner({ onScan, enabled }: { onScan: (code: string) => void; enable
         if (mounted) setCameraActive(true);
       } catch (err: unknown) {
         if (mounted) {
-          const message = err instanceof Error ? err.message : typeof (err as any)?.message === "string" ? (err as any).message : "Unknown error";
+          const message =
+            err instanceof Error
+              ? err.message
+              : typeof err === "object" &&
+                  err !== null &&
+                  "message" in err &&
+                  typeof err.message === "string"
+                ? err.message
+                : "Unknown error";
           setCameraError(
             message.includes("NotAllowed")
               ? "Camera access denied. Please allow camera permissions."

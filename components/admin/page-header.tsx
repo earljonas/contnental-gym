@@ -3,10 +3,12 @@ import { Button } from "@/components/ui/button";
 export function AdminPageHeader({
   title,
   actionLabel,
+  action,
   onAction,
 }: {
   title: string;
   actionLabel?: string;
+  action?: React.ReactNode;
   onAction?: () => void;
 }) {
   return (
@@ -17,7 +19,9 @@ export function AdminPageHeader({
         </h2>
       </div>
 
-      {actionLabel ? (
+      {action ? (
+        action
+      ) : actionLabel ? (
         onAction ? (
           <Button
             type="button"

@@ -51,8 +51,25 @@ CREATE POLICY "Branch admins can view live announcements" ON public.announcement
   FOR SELECT USING (
     public.is_branch_admin()
     AND status = 'SENT'
-    AND (
-      all_branches = true
-      OR public.my_branch_id() = ANY(audience_branch_ids)
+  );
+
+DROP POLICY IF EXISTS "Members can view live announcements" ON public.announcements;
+CREATE POLICY "Members can view live announcements" ON public.announcements
+  FOR SELECT USING (
+    status = 'SENT'
+    AND EXISTS (
+      SELECT 1
+      FROM public.profiles member_profile
+      WHERE member_profile.id = auth.uid()
+        AND member_profile.role = 'MEMBER'
     )
   );
+
+-- From this point forward, announcements are global for all members and
+-- branch admins. Normalize any existing branch-targeted rows.
+UPDATE public.announcements
+SET
+  all_branches = true,
+  audience_branch_ids = '{}'
+WHERE all_branches = false
+  OR audience_branch_ids <> '{}';

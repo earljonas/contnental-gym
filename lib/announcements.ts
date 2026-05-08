@@ -114,3 +114,31 @@ export async function getBranchAnnouncements(): Promise<AnnouncementItem[]> {
     formatAnnouncement(announcement as RawAnnouncement, branchesById)
   );
 }
+
+export async function getMemberAnnouncements(userId: string): Promise<AnnouncementItem[]> {
+  const supabase = await createClient();
+  const [profileResult, announcementsResult, branches] = await Promise.all([
+    supabase.from("profiles").select("id").eq("id", userId).eq("role", "MEMBER").single(),
+    supabase
+      .from("announcements")
+      .select("id, title, body, all_branches, audience_branch_ids, status, publish_at, created_at")
+      .eq("status", "SENT")
+      .order("publish_at", { ascending: false })
+      .limit(5),
+    getAnnouncementBranchOptions(),
+  ]);
+
+  if (!profileResult.data) {
+    return [];
+  }
+
+  if (announcementsResult.error) {
+    console.error("[getMemberAnnouncements] Error:", announcementsResult.error);
+    return [];
+  }
+
+  const branchesById = new Map(branches.map((branch) => [branch.id, branch.name]));
+  return (announcementsResult.data ?? []).map((announcement) =>
+    formatAnnouncement(announcement as RawAnnouncement, branchesById)
+  );
+}

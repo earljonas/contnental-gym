@@ -23,6 +23,7 @@ import {
 import { ActivateModal } from "@/app/(branch)/branch/activate-modal";
 import {
   manualCheckInFromMembers,
+  registerWalkInMember,
   updateBranchMemberProfile,
 } from "@/app/(branch)/branch/members/actions";
 import { AdminPageHeader } from "@/components/admin/page-header";
@@ -43,6 +44,7 @@ import {
 } from "@/components/ui/table";
 import type {
   BranchMembersData,
+  BranchPlanOption,
   MemberDetails,
   PendingMember,
 } from "@/lib/branch-admin/data";
@@ -499,15 +501,308 @@ function BranchMemberSheet({
   );
 }
 
+function RegisterWalkInMemberModal({
+  plans,
+  onClose,
+}: {
+  plans: BranchPlanOption[];
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [planId, setPlanId] = useState(plans[0]?.id.toString() ?? "");
+  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "GCASH">("CASH");
+  const [referenceNumber, setReferenceNumber] = useState("");
+
+  const selectedPlan = plans.find((plan) => plan.id.toString() === planId) ?? null;
+
+  function generatePassword() {
+    const token = Math.random().toString(36).slice(2, 8).toUpperCase();
+    setPassword(`CF-${token}-${new Date().getFullYear()}`);
+  }
+
+  function handleSubmit() {
+    if (!selectedPlan) {
+      setError("Select a membership plan");
+      return;
+    }
+
+    startTransition(async () => {
+      setError("");
+      const result = await registerWalkInMember({
+        firstName,
+        lastName,
+        email,
+        phone,
+        password,
+        planId: selectedPlan.id,
+        paymentMethod,
+        referenceNumber: paymentMethod === "GCASH" ? referenceNumber : undefined,
+      });
+
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+
+      onClose();
+      router.push(`/branch/members?memberId=${result.memberId}`);
+      router.refresh();
+    });
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="walk-in-register-title"
+      onClick={onClose}
+    >
+      <div
+        className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-border bg-card"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-border bg-secondary/30 p-6">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+              Walk-in Registration
+            </p>
+            <h2
+              id="walk-in-register-title"
+              className="mt-1 font-display text-3xl font-black uppercase leading-none tracking-tight text-foreground"
+            >
+              Register Member
+            </h2>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            className="rounded-xl"
+            onClick={onClose}
+            disabled={isPending}
+            aria-label="Close registration"
+          >
+            <X className="size-4" />
+          </Button>
+        </div>
+
+        <div className="space-y-6 overflow-y-auto p-6">
+          <section className="space-y-4">
+            <h3 className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+              Member Details
+            </h3>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="walkin-first-name" className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                  First name
+                </Label>
+                <Input
+                  id="walkin-first-name"
+                  value={firstName}
+                  onChange={(event) => setFirstName(event.target.value)}
+                  className="h-11 rounded-xl focus:border-[#C9973E] focus:ring-[#C9973E]/20"
+                  disabled={isPending}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="walkin-last-name" className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                  Last name
+                </Label>
+                <Input
+                  id="walkin-last-name"
+                  value={lastName}
+                  onChange={(event) => setLastName(event.target.value)}
+                  className="h-11 rounded-xl focus:border-[#C9973E] focus:ring-[#C9973E]/20"
+                  disabled={isPending}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="walkin-email" className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                  Email
+                </Label>
+                <Input
+                  id="walkin-email"
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  className="h-11 rounded-xl focus:border-[#C9973E] focus:ring-[#C9973E]/20"
+                  disabled={isPending}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="walkin-phone" className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                  Phone
+                </Label>
+                <Input
+                  id="walkin-phone"
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                  className="h-11 rounded-xl focus:border-[#C9973E] focus:ring-[#C9973E]/20"
+                  disabled={isPending}
+                />
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <h3 className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+              Membership and Payment
+            </h3>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="walkin-plan" className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                  Plan
+                </Label>
+                <Select
+                  id="walkin-plan"
+                  value={planId}
+                  onChange={(event) => setPlanId(event.target.value)}
+                  className="h-11 rounded-xl focus:border-[#C9973E] focus:ring-[#C9973E]/20"
+                  disabled={isPending || plans.length === 0}
+                >
+                  {plans.map((plan) => (
+                    <option key={plan.id} value={plan.id}>
+                      {plan.name} - PHP {plan.price.toLocaleString()}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="walkin-method" className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                  Payment method
+                </Label>
+                <Select
+                  id="walkin-method"
+                  value={paymentMethod}
+                  onChange={(event) => setPaymentMethod(event.target.value as "CASH" | "GCASH")}
+                  className="h-11 rounded-xl focus:border-[#C9973E] focus:ring-[#C9973E]/20"
+                  disabled={isPending}
+                >
+                  <option value="CASH">Cash</option>
+                  <option value="GCASH">GCash</option>
+                </Select>
+              </div>
+              {paymentMethod === "GCASH" ? (
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="walkin-reference" className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                    Reference number
+                  </Label>
+                  <Input
+                    id="walkin-reference"
+                    value={referenceNumber}
+                    onChange={(event) => setReferenceNumber(event.target.value)}
+                    className="h-11 rounded-xl focus:border-[#C9973E] focus:ring-[#C9973E]/20"
+                    disabled={isPending}
+                  />
+                </div>
+              ) : null}
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <h3 className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+              Login Access
+            </h3>
+            <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+              <div className="space-y-2">
+                <Label htmlFor="walkin-password" className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                  Temporary password
+                </Label>
+                <Input
+                  id="walkin-password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  className="h-11 rounded-xl focus:border-[#C9973E] focus:ring-[#C9973E]/20"
+                  disabled={isPending}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 self-end rounded-xl"
+                onClick={generatePassword}
+                disabled={isPending}
+              >
+                Generate
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Give this password to the member after registration. They can change it in their profile.
+            </p>
+          </section>
+
+          <section className="rounded-2xl border border-border bg-secondary/30 p-5">
+            <h3 className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+              Summary
+            </h3>
+            <div className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+              <div>
+                <p className="text-xs text-muted-foreground">Plan</p>
+                <p className="font-semibold text-foreground">{selectedPlan?.name ?? "No plan"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Amount</p>
+                <p className="font-semibold text-foreground">
+                  {selectedPlan ? `PHP ${selectedPlan.price.toLocaleString()}` : "PHP 0"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Status</p>
+                <p className="font-semibold text-emerald-500">Active after save</p>
+              </div>
+            </div>
+          </section>
+
+          {error ? (
+            <p className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-500">
+              {error}
+            </p>
+          ) : null}
+
+          <div className="flex justify-end gap-3 border-t border-border pt-5">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 rounded-xl px-5"
+              onClick={onClose}
+              disabled={isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="h-11 rounded-xl bg-[#C9973E] px-5 font-bold uppercase tracking-wider text-black"
+              onClick={handleSubmit}
+              disabled={isPending || plans.length === 0}
+            >
+              {isPending ? "Creating..." : "Create and Activate"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function BranchMembersPage({
   data,
   pendingWalkups,
   memberDetails,
+  planOptions,
   editMode,
 }: {
   data: BranchMembersData;
   pendingWalkups: PendingMember[];
   memberDetails: MemberDetails | null;
+  planOptions: BranchPlanOption[];
   editMode: boolean;
 }) {
   const router = useRouter();
@@ -518,6 +813,7 @@ export function BranchMembersPage({
   const [planFilter, setPlanFilter] = useState("All");
   const [checkInFeedback, setCheckInFeedback] = useState<Feedback>(null);
   const [activatingMember, setActivatingMember] = useState<PendingMember | null>(null);
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
 
   const filteredMembers = data.members.filter((member) => {
     if (search.trim()) {
@@ -564,7 +860,11 @@ export function BranchMembersPage({
   return (
     <AdminPageTransition>
       <div className="space-y-8">
-        <AdminPageHeader title="Members" />
+        <AdminPageHeader
+          title="Members"
+          actionLabel="Register Member"
+          onAction={() => setShowRegisterModal(true)}
+        />
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {metrics.map((metric) => (
@@ -799,6 +1099,13 @@ export function BranchMembersPage({
 
       {activatingMember ? (
         <ActivateModal member={activatingMember} onClose={() => setActivatingMember(null)} />
+      ) : null}
+
+      {showRegisterModal ? (
+        <RegisterWalkInMemberModal
+          plans={planOptions}
+          onClose={() => setShowRegisterModal(false)}
+        />
       ) : null}
     </AdminPageTransition>
   );

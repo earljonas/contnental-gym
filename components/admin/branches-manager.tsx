@@ -10,7 +10,7 @@ import { AdminPageTransition } from "@/components/admin/page-transition";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createClient } from "@/lib/supabase/client";
+import { updateBranch } from "@/app/(admin)/super-admin/branches/actions";
 
 export type BranchCard = {
   id: number;
@@ -32,7 +32,6 @@ export function BranchesManager({
   initialBranches: BranchCard[];
 }) {
   const router = useRouter();
-  const supabase = createClient();
   const [branches, setBranches] = useState(initialBranches);
   const [editingBranch, setEditingBranch] = useState<EditState>(null);
   const [errorMessage, setErrorMessage] = useState("");
@@ -80,22 +79,21 @@ export function BranchesManager({
     startTransition(async () => {
       setErrorMessage("");
 
-      const { data, error } = await supabase
-        .from("branches")
-        .update({ name, location })
-        .eq("id", editingBranch.id)
-        .select("id, name, location")
-        .single();
+      const result = await updateBranch({
+        id: editingBranch.id,
+        name,
+        location,
+      });
 
-      if (error || !data) {
-        setErrorMessage(error?.message ?? "Unable to save branch changes.");
+      if (result.error || !result.branch) {
+        setErrorMessage(result.error ?? "Unable to save branch changes.");
         return;
       }
 
       setBranches((current) =>
         current.map((branch) =>
-          branch.id === data.id
-            ? { ...branch, name: data.name, location: data.location ?? branch.location }
+          branch.id === result.branch.id
+            ? { ...branch, name: result.branch.name, location: result.branch.location }
             : branch
         )
       );
@@ -116,11 +114,8 @@ export function BranchesManager({
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1, duration: 0.4 }}
               key={branch.id}
-              className="group relative flex flex-col justify-between overflow-hidden rounded-[32px] border border-border bg-card p-8 transition-all hover:border-white/20 hover:shadow-2xl"
+              className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-border bg-card p-8 transition-colors hover:border-foreground/30"
             >
-              {/* Decorative Background Element */}
-              <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary/5 blur-[60px] transition-all group-hover:bg-primary/10" />
-
               <div className="relative z-10 flex items-start justify-between gap-4">
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-2 mb-2">
@@ -146,7 +141,7 @@ export function BranchesManager({
 
                 <button
                   onClick={() => openEditor(branch)}
-                  className="flex size-10 shrink-0 items-center justify-center rounded-full border border-border bg-background/50 text-muted-foreground transition-all hover:bg-foreground hover:text-background hover:border-foreground"
+                  className="flex size-10 shrink-0 items-center justify-center rounded-full border border-border bg-secondary/50 text-muted-foreground transition-colors hover:border-foreground hover:bg-foreground hover:text-background"
                   aria-label="Edit branch"
                 >
                   <Edit2 className="size-4" />
@@ -156,7 +151,7 @@ export function BranchesManager({
               <div className="relative z-10 mt-10 flex items-end justify-between border-t border-border/50 pt-6">
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-                    Activated Here
+                    Registered Here
                   </p>
                   <div className="flex items-baseline gap-2">
                     <span className="font-display text-4xl font-black tracking-tighter text-foreground leading-none">
@@ -175,7 +170,7 @@ export function BranchesManager({
         {/* Editor Modal */}
         {editingBranch ? (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm"
             role="dialog"
             aria-modal="true"
             aria-labelledby="branch-editor-title"
@@ -183,7 +178,7 @@ export function BranchesManager({
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="w-full max-w-lg overflow-hidden rounded-[32px] border border-border bg-card shadow-2xl"
+              className="w-full max-w-lg overflow-hidden rounded-3xl border border-border bg-card"
             >
               <div className="flex items-center justify-between border-b border-border/50 bg-secondary/30 px-8 py-6">
                 <div>
@@ -198,7 +193,7 @@ export function BranchesManager({
                   type="button"
                   onClick={closeEditor}
                   disabled={isPending}
-                  className="flex size-8 items-center justify-center rounded-full bg-background/50 text-muted-foreground hover:bg-foreground hover:text-background transition-colors"
+                  className="flex size-8 items-center justify-center rounded-full bg-secondary/50 text-muted-foreground transition-colors hover:bg-foreground hover:text-background"
                   aria-label="Close branch editor"
                 >
                   <X className="size-4" />

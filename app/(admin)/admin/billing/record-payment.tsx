@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
@@ -14,6 +14,10 @@ import { recordPayment } from "./actions";
 type MemberOption = {
   id: string;
   name: string;
+  planPrice: number;
+  planName: string;
+  paymentState: "PAYABLE" | "ALREADY_PAID" | "NO_MEMBERSHIP" | "NO_PENDING_MEMBERSHIP";
+  note: string;
 };
 
 type BranchOption = {
@@ -34,18 +38,51 @@ export function RecordPaymentButton({
   const [error, setError] = useState("");
 
   const [userId, setUserId] = useState("");
+  const [search, setSearch] = useState("");
+  const [selectedMember, setSelectedMember] = useState<MemberOption | null>(null);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [branchId, setBranchId] = useState("");
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<"CASH" | "GCASH">("CASH");
   const [referenceNumber, setReferenceNumber] = useState("");
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const filteredMembers = search.trim().length > 0
+    ? members.filter((member) => member.name.toLowerCase().includes(search.toLowerCase())).slice(0, 10)
+    : members.slice(0, 10);
+  const selectedMemberCanPay = selectedMember?.paymentState === "PAYABLE";
+
+  useEffect(() => {
+    function handleClick(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
 
   function resetForm() {
     setUserId("");
+    setSearch("");
+    setSelectedMember(null);
+    setIsDropdownOpen(false);
     setBranchId("");
     setAmount("");
     setMethod("CASH");
     setReferenceNumber("");
     setError("");
+  }
+
+  function handleSelectMember(member: MemberOption) {
+    setUserId(member.id);
+    setSelectedMember(member);
+    setSearch(member.name);
+    setIsDropdownOpen(false);
+    if (member.planPrice > 0) {
+      setAmount(member.planPrice.toString());
+    }
+    setError(member.paymentState === "PAYABLE" ? "" : member.note);
   }
 
   function handleClose() {
@@ -57,6 +94,10 @@ export function RecordPaymentButton({
   function handleSubmit() {
     if (!userId) {
       setError("Please select a member.");
+      return;
+    }
+    if (!selectedMember || selectedMember.paymentState !== "PAYABLE") {
+      setError(selectedMember?.note ?? "Please select a member with a pending unpaid membership.");
       return;
     }
     if (!branchId) {
@@ -110,7 +151,7 @@ export function RecordPaymentButton({
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-lg overflow-hidden rounded-[32px] border border-border bg-card shadow-2xl"
+            className="w-full max-w-lg overflow-hidden rounded-3xl border border-border bg-card"
           >
             <div className="flex items-center justify-between border-b border-border/50 bg-secondary/30 px-8 py-6">
               <div>
@@ -136,24 +177,54 @@ export function RecordPaymentButton({
             </div>
 
             <div className="p-8 space-y-6">
-              <div className="space-y-2.5">
+              <div className="space-y-2.5" ref={dropdownRef}>
                 <Label htmlFor="payment-member" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
                   Member
                 </Label>
-                <Select
+                <div className="relative">
+                <Input
                   id="payment-member"
-                  value={userId}
-                  onChange={(e) => setUserId(e.target.value)}
-                  className="h-12 rounded-2xl bg-secondary/20"
+                  value={search}
+                  onChange={(event) => {
+                    setSearch(event.target.value);
+                    setUserId("");
+                    setSelectedMember(null);
+                    setAmount("");
+                    setIsDropdownOpen(true);
+                  }}
+                  onFocus={() => setIsDropdownOpen(true)}
+                  placeholder="Search member name..."
+                  className="h-11 rounded-xl bg-secondary/20 focus:border-[#C9973E] focus:ring-[#C9973E]/20"
                   disabled={isPending}
-                >
-                  <option value="">Select member</option>
-                  {members.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                    </option>
-                  ))}
-                </Select>
+                />
+                {isDropdownOpen && filteredMembers.length > 0 ? (
+                  <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-56 overflow-y-auto rounded-2xl border border-border bg-card">
+                    {filteredMembers.map((member) => (
+                      <button
+                        key={member.id}
+                        type="button"
+                        className="w-full px-4 py-3 text-left text-sm font-medium text-foreground transition-colors hover:bg-secondary/50 first:rounded-t-2xl last:rounded-b-2xl"
+                        onClick={() => handleSelectMember(member)}
+                      >
+                        <span className="block">{member.name}</span>
+                        <span className="mt-0.5 block text-xs text-muted-foreground">
+                          {member.planName} {member.planPrice > 0 ? `- PHP ${member.planPrice.toLocaleString()}` : ""} · {member.note}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                {isDropdownOpen && search.trim().length > 0 && filteredMembers.length === 0 ? (
+                  <div className="absolute left-0 right-0 top-full z-20 mt-2 rounded-2xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+                    No member found for this name.
+                  </div>
+                ) : null}
+                </div>
+                {selectedMember && !selectedMemberCanPay ? (
+                  <p className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm font-medium text-amber-500">
+                    {selectedMember.note}
+                  </p>
+                ) : null}
               </div>
 
               <div className="space-y-2.5">
@@ -164,7 +235,7 @@ export function RecordPaymentButton({
                   id="payment-branch"
                   value={branchId}
                   onChange={(e) => setBranchId(e.target.value)}
-                  className="h-12 rounded-2xl bg-secondary/20"
+                  className="h-11 rounded-xl bg-secondary/20 focus:border-[#C9973E] focus:ring-[#C9973E]/20"
                   disabled={isPending}
                 >
                   <option value="">Select branch</option>
@@ -188,7 +259,7 @@ export function RecordPaymentButton({
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="0.00"
-                  className="h-12 rounded-2xl bg-secondary/20"
+                  className="h-11 rounded-xl bg-secondary/20 focus:border-[#C9973E] focus:ring-[#C9973E]/20"
                   disabled={isPending}
                 />
               </div>
@@ -201,7 +272,7 @@ export function RecordPaymentButton({
                   id="payment-method"
                   value={method}
                   onChange={(e) => setMethod(e.target.value as "CASH" | "GCASH")}
-                  className="h-12 rounded-2xl bg-secondary/20"
+                  className="h-11 rounded-xl bg-secondary/20 focus:border-[#C9973E] focus:ring-[#C9973E]/20"
                   disabled={isPending}
                 >
                   <option value="CASH">Cash</option>
@@ -209,19 +280,21 @@ export function RecordPaymentButton({
                 </Select>
               </div>
 
-              <div className="space-y-2.5">
-                <Label htmlFor="payment-ref" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                  Reference Number <span className="text-muted-foreground/50">(optional)</span>
-                </Label>
-                <Input
-                  id="payment-ref"
-                  value={referenceNumber}
-                  onChange={(e) => setReferenceNumber(e.target.value)}
-                  placeholder="e.g. GCash ref #"
-                  className="h-12 rounded-2xl bg-secondary/20"
-                  disabled={isPending}
-                />
-              </div>
+              {method === "GCASH" ? (
+                <div className="space-y-2.5">
+                  <Label htmlFor="payment-ref" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                    Reference Number
+                  </Label>
+                  <Input
+                    id="payment-ref"
+                    value={referenceNumber}
+                    onChange={(e) => setReferenceNumber(e.target.value)}
+                    placeholder="e.g. GCash ref #"
+                    className="h-11 rounded-xl bg-secondary/20 focus:border-[#C9973E] focus:ring-[#C9973E]/20"
+                    disabled={isPending}
+                  />
+                </div>
+              ) : null}
 
               {error ? (
                 <p className="text-sm font-medium text-destructive bg-destructive/10 px-4 py-3 rounded-xl">
@@ -241,9 +314,9 @@ export function RecordPaymentButton({
                 </Button>
                 <Button
                   type="button"
-                  className="h-12 rounded-2xl px-8 text-xs font-bold uppercase tracking-[0.16em]"
+                  className="h-11 rounded-xl bg-[#C9973E] px-8 text-xs font-bold uppercase tracking-[0.16em] text-black"
                   onClick={handleSubmit}
-                  disabled={isPending}
+                  disabled={isPending || !selectedMemberCanPay}
                 >
                   {isPending ? "Saving..." : "Confirm payment"}
                 </Button>

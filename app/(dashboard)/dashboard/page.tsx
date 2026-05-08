@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { MemberHome } from "@/components/member/member-home";
 import { pickCurrentMembership } from "@/lib/member-membership";
+import { getMemberAnnouncements } from "@/lib/announcements";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -99,6 +100,7 @@ export default async function DashboardPage() {
   }
 
   const sessionsThisWeek = weekDays.filter((d) => d.hasWorkout).length;
+  const announcements = await getMemberAnnouncements(user!.id);
 
   // ── Membership status info ──
   const plan = membership?.membership_plans;
@@ -121,6 +123,12 @@ export default async function DashboardPage() {
       weeklyGoal={5}
       weekDays={weekDays}
       streak={streak}
+      announcements={announcements.map((announcement) => ({
+        id: announcement.id,
+        title: announcement.title,
+        body: announcement.body,
+        publishAt: announcement.publishAt,
+      }))}
     />
   );
 }

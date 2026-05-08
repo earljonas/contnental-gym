@@ -1,6 +1,4 @@
 import { ResourcePage } from "@/components/admin/resource-page";
-import { RevenueOutstandingChart } from "@/components/admin/data-charts";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getBillingMemberOptions } from "@/lib/branch-admin/data";
 import { getSuperAdminOverview } from "@/lib/super-admin/data";
 import { createClient } from "@/lib/supabase/server";
@@ -22,7 +20,6 @@ export default async function BillingPage() {
   return (
     <ResourcePage
       title="Billing"
-      actionLabel="Generate summary"
       summary={[
         { label: "Confirmed", value: overview.payments.filter((item) => item.status === "Confirmed").length.toString() },
         { label: "Pending", value: overview.payments.filter((item) => item.status === "Pending").length.toString() },
@@ -36,7 +33,7 @@ export default async function BillingPage() {
         { header: "Collected At", key: "branch" },
         { header: "Amount", key: "amount" },
         { header: "Method", key: "method" },
-        { header: "Date", key: "dueDate" },
+        { header: "Payment Date", key: "dueDate" },
         { header: "Status", key: "status", cellType: "status" },
         { header: "Action", cellType: "payment-action" },
       ]}
@@ -53,18 +50,6 @@ export default async function BillingPage() {
         { key: "method", label: "Method", options: [...new Set(overview.payments.map((item) => item.method).filter(Boolean))] },
       ]}
       dateKey="dueDate"
-      charts={
-        <div className="grid grid-cols-1 max-w-2xl">
-          <Card>
-            <CardHeader>
-              <CardTitle>Cash Flow Receivables</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <RevenueOutstandingChart />
-            </CardContent>
-          </Card>
-        </div>
-      }
     />
   );
 }

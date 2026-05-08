@@ -13,100 +13,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import type { AnnouncementBranchOption, AnnouncementItem } from "@/lib/announcements";
-import { cn } from "@/lib/utils";
+import type { AnnouncementItem } from "@/lib/announcements";
 import { sendAnnouncement } from "@/app/(admin)/admin/announcements/actions";
 
-function BranchSelector({
-  branches,
-  selectedIds,
-  onChange,
-}: {
-  branches: AnnouncementBranchOption[];
-  selectedIds: Set<number>;
-  onChange: (updated: Set<number>) => void;
-}) {
-  const allSelected = selectedIds.size === branches.length;
-
-  function toggleAll() {
-    if (allSelected) {
-      onChange(new Set());
-      return;
-    }
-
-    onChange(new Set(branches.map((branch) => branch.id)));
-  }
-
-  function toggleBranch(branchId: number) {
-    const next = new Set(selectedIds);
-    if (next.has(branchId)) {
-      next.delete(branchId);
-    } else {
-      next.add(branchId);
-    }
-    onChange(next);
-  }
-
-  return (
-    <div className="space-y-2">
-      <Label>Audience</Label>
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={toggleAll}
-          className={cn(
-            "h-9 rounded-xl border px-3 text-xs font-semibold uppercase tracking-[0.14em] transition-colors",
-            allSelected
-              ? "border-foreground bg-foreground text-background"
-              : "border-border bg-transparent text-muted-foreground hover:border-foreground/40 hover:text-foreground"
-          )}
-        >
-          All branches
-        </button>
-
-        {branches.map((branch) => {
-          const active = selectedIds.has(branch.id);
-          return (
-            <button
-              key={branch.id}
-              type="button"
-              onClick={() => toggleBranch(branch.id)}
-              className={cn(
-                "h-9 rounded-xl border px-3 text-xs font-semibold uppercase tracking-[0.14em] transition-colors",
-                active
-                  ? "border-foreground bg-foreground text-background"
-                  : "border-border bg-transparent text-muted-foreground hover:border-foreground/40 hover:text-foreground"
-              )}
-            >
-              {branch.name}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 export function SuperAnnouncementsPage({
-  branches,
   announcements,
 }: {
-  branches: AnnouncementBranchOption[];
   announcements: AnnouncementItem[];
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [selectedBranches, setSelectedBranches] = useState<Set<number>>(
-    new Set(branches.map((branch) => branch.id))
-  );
   const [error, setError] = useState("");
 
   function resetForm() {
     setTitle("");
     setBody("");
-    setSelectedBranches(new Set(branches.map((branch) => branch.id)));
     setError("");
   }
 
@@ -116,8 +39,6 @@ export function SuperAnnouncementsPage({
       const result = await sendAnnouncement({
         title,
         body,
-        branchIds: [...selectedBranches],
-        allBranches: selectedBranches.size === branches.length,
       });
 
       if (result.error) {
@@ -153,11 +74,15 @@ export function SuperAnnouncementsPage({
                 />
               </div>
 
-              <BranchSelector
-                branches={branches}
-                selectedIds={selectedBranches}
-                onChange={setSelectedBranches}
-              />
+              <div className="rounded-2xl border border-border bg-secondary/30 px-4 py-3">
+                <Label className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                  Audience
+                </Label>
+                <p className="mt-1 text-sm font-semibold text-foreground">Everyone</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Sent to all members and branch admins.
+                </p>
+              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="announcement-message">Message</Label>
@@ -193,7 +118,7 @@ export function SuperAnnouncementsPage({
 
           <Card>
             <CardHeader className="flex-row items-center justify-between space-y-0">
-              <CardTitle>Queue</CardTitle>
+              <CardTitle>Announcement History</CardTitle>
               <Badge variant="secondary">Live</Badge>
             </CardHeader>
             <CardContent>

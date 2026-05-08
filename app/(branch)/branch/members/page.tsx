@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { BranchMembersPage } from "@/components/admin/branch-members";
 import {
+  getBranchPlanOptions,
   getBranchMembers,
   getBranchMemberDetails,
 } from "@/lib/branch-admin/data";
@@ -80,12 +81,13 @@ export default async function MembersPage({
 
   const params = await searchParams;
 
-  const [data, pendingWalkups, memberDetails] = await Promise.all([
+  const [data, pendingWalkups, memberDetails, planOptions] = await Promise.all([
     getBranchMembers(roleInfo.branch_id),
     getPendingWalkups(),
     params.memberId
       ? getBranchMemberDetails(params.memberId, roleInfo.branch_id)
       : Promise.resolve(null),
+    getBranchPlanOptions(),
   ]);
 
   return (
@@ -93,6 +95,7 @@ export default async function MembersPage({
       data={data}
       pendingWalkups={pendingWalkups}
       memberDetails={memberDetails}
+      planOptions={planOptions}
       editMode={params.edit === "1"}
     />
   );

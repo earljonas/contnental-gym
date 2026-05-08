@@ -1,3 +1,5 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 export type AppRole = "SUPER_ADMIN" | "BRANCH_ADMIN" | "MEMBER";
 
 type RoleRecord = {
@@ -10,7 +12,7 @@ type RoleLookupResult = {
   error: { code?: string; message?: string } | null;
 };
 async function readRole(
-  supabase: any,
+  supabase: SupabaseClient,
   table: "user_roles" | "profiles",
   idColumn: "user_id" | "id",
   userId: string
@@ -29,7 +31,7 @@ async function readRole(
 }
 
 export async function getUserRole(
-  supabase: any,
+  supabase: SupabaseClient,
   userId: string
 ): Promise<RoleRecord> {
   const userRolesResult = await readRole(supabase, "user_roles", "user_id", userId);

@@ -62,6 +62,39 @@ export type AttendanceRow = {
   date: string;
 };
 
+export type SuperAttendanceMetric = {
+  label: string;
+  value: string;
+  detail: string;
+};
+
+export type AttendanceTrendPoint = {
+  label: string;
+  value: number;
+};
+
+export type AttendanceBranchPoint = {
+  branch: string;
+  value: number;
+};
+
+export type SuperAttendanceLogRow = {
+  id: number;
+  member: string;
+  branch: string;
+  date: string;
+  time: string;
+  rawTime: string;
+};
+
+export type SuperAdminAttendanceData = {
+  metrics: SuperAttendanceMetric[];
+  dailyTrend: AttendanceTrendPoint[];
+  branchSplit: AttendanceBranchPoint[];
+  rows: SuperAttendanceLogRow[];
+  branchOptions: string[];
+};
+
 
 
 export type RetentionRow = {
@@ -84,6 +117,7 @@ type OverviewData = {
   metrics: DashboardMetric[];
   revenueTrend: TrendPoint[];
   checkInTrend: TrendPoint[];
+  branchRevenue: DistributionPoint[];
   planDistribution: DistributionPoint[];
   recentActivity: ActivityRow[];
   members: MemberRow[];
@@ -94,221 +128,24 @@ type OverviewData = {
   announcements: AnnouncementRow[];
 };
 
-const fallbackData: OverviewData = {
+const emptyOverview: OverviewData = {
   metrics: [
-    { label: "Active members", value: "1,248", delta: "+8.2%", trend: "up" },
-    { label: "Total MRR", value: "PHP 486K", delta: "+12.4%", trend: "up" },
-    { label: "Churn rate (30d)", value: "2.4%", delta: "-0.5%", trend: "up" },
-    { label: "Branch utilisation", value: "68%", delta: "+4.1%", trend: "up" },
+    { label: "Active members", value: "0", delta: "No active members", trend: "neutral" },
+    { label: "Monthly revenue", value: "PHP 0", delta: "0 confirmed payments", trend: "neutral" },
+    { label: "Daily check-ins", value: "0", delta: "No visits today", trend: "neutral" },
+    { label: "Overdue accounts", value: "0", delta: "On track", trend: "neutral" },
   ],
-  revenueTrend: [
-    { label: "Jan", value: 320000 },
-    { label: "Feb", value: 356000 },
-    { label: "Mar", value: 381000 },
-    { label: "Apr", value: 402000 },
-    { label: "May", value: 430000 },
-    { label: "Jun", value: 486000 },
-  ],
-  checkInTrend: [
-    { label: "Mon", value: 220 },
-    { label: "Tue", value: 254 },
-    { label: "Wed", value: 287 },
-    { label: "Thu", value: 301 },
-    { label: "Fri", value: 312 },
-    { label: "Sat", value: 276 },
-    { label: "Sun", value: 198 },
-  ],
-  planDistribution: [
-    { label: "1 Month", value: 432 },
-    { label: "3 Months", value: 311 },
-    { label: "6 Months", value: 289 },
-    { label: "12 Months", value: 216 },
-  ],
-  recentActivity: [
-    {
-      member: "Mikaela Santos",
-      branch: "Ecoland",
-      activity: "Membership upgraded to 12 Months",
-      amount: "PHP 9,600",
-      timestamp: "10 min ago",
-      status: "success",
-    },
-    {
-      member: "Jerome Cruz",
-      branch: "Lanang",
-      activity: "Payment awaiting confirmation",
-      amount: "PHP 2,700",
-      timestamp: "23 min ago",
-      status: "warning",
-    },
-    {
-      member: "Alyssa Tan",
-      branch: "Torres",
-      activity: "Flagged by churn analyzer",
-      timestamp: "45 min ago",
-      status: "danger",
-    },
-    {
-      member: "Noah Reyes",
-      branch: "Ecoland",
-      activity: "Reached 30-day streak",
-      timestamp: "1 hr ago",
-      status: "success",
-    },
-  ],
-  members: [
-    {
-      id: "a-123",
-      name: "Mikaela Santos",
-      email: "mikaela@contnental.fit",
-      branch: "Ecoland",
-      plan: "12 Months",
-      status: "Active",
-      joined: "Apr 12, 2026",
-    },
-    {
-      id: "b-234",
-      name: "Jerome Cruz",
-      email: "jerome@contnental.fit",
-      branch: "Lanang",
-      plan: "3 Months",
-      status: "Pending",
-      joined: "Apr 10, 2026",
-    },
-    {
-      id: "c-456",
-      name: "Alyssa Tan",
-      email: "alyssa@contnental.fit",
-      branch: "Torres",
-      plan: "1 Month",
-      status: "At Risk",
-      joined: "Mar 18, 2026",
-    },
-    {
-      id: "d-789",
-      name: "Noah Reyes",
-      email: "noah@contnental.fit",
-      branch: "Ecoland",
-      plan: "6 Months",
-      status: "Active",
-      joined: "Mar 06, 2026",
-    },
-  ],
-  plans: [
-    {
-      name: "1 Month",
-      tier: "Access",
-      price: "PHP 1,000",
-      duration: "30 days",
-      access: "Standard gym access",
-      status: "Active",
-    },
-    {
-      name: "3 Months",
-      tier: "Access",
-      price: "PHP 2,700",
-      duration: "90 days",
-      access: "Standard gym access",
-      status: "Active",
-    },
-    {
-      name: "6 Months",
-      tier: "Access",
-      price: "PHP 5,100",
-      duration: "180 days",
-      access: "Standard gym access",
-      status: "Active",
-    },
-    {
-      name: "12 Months",
-      tier: "Access",
-      price: "PHP 9,600",
-      duration: "365 days",
-      access: "Standard gym access",
-      status: "Active",
-    },
-  ],
-  payments: [
-    {
-      id: 1,
-      member: "Jerome Cruz",
-      branch: "Lanang",
-      amount: "PHP 2,700",
-      method: "GCash",
-      dueDate: "Apr 18, 2026",
-      status: "Pending",
-    },
-    {
-      id: 2,
-      member: "Mikaela Santos",
-      branch: "Ecoland",
-      amount: "PHP 9,600",
-      method: "Cash",
-      dueDate: "Apr 17, 2026",
-      status: "Confirmed",
-    },
-    {
-      id: 3,
-      member: "Rica Flores",
-      branch: "Torres",
-      amount: "PHP 1,000",
-      method: "GCash",
-      dueDate: "Apr 14, 2026",
-      status: "Overdue",
-    },
-  ],
-  attendance: [
-    { member: "Mikaela Santos", branch: "Ecoland", time: "6:14 AM", date: "Apr 17, 2026" },
-    { member: "Noah Reyes", branch: "Ecoland", time: "7:02 AM", date: "Apr 17, 2026" },
-    { member: "Alyssa Tan", branch: "Torres", time: "8:16 AM", date: "Apr 17, 2026" },
-    { member: "Jerome Cruz", branch: "Lanang", time: "5:48 PM", date: "Apr 16, 2026" },
-  ],
-  retention: [
-    {
-      member: "Alyssa Tan",
-      lastVisit: "12 days ago",
-      risk: "High",
-      trigger: "Usage dropped 63% this month",
-      action: "Offer a free coaching review",
-    },
-    {
-      member: "Paolo Ramos",
-      lastVisit: "7 days ago",
-      risk: "Medium",
-      trigger: "Upcoming renewal and low attendance",
-      action: "Send renewal reminder with add-on bundle",
-    },
-    {
-      member: "Rica Flores",
-      lastVisit: "4 days ago",
-      risk: "Low",
-      trigger: "One missed payment",
-      action: "Schedule payment follow-up",
-    },
-  ],
-  announcements: [
-    {
-      title: "Holiday schedule advisory",
-      audience: "All members",
-      channel: "Portal + email",
-      status: "Sent",
-      publishAt: "Apr 15, 2026",
-    },
-    {
-      title: "3 Month plan refresh",
-      audience: "3 Month members",
-      channel: "Email",
-      status: "Scheduled",
-      publishAt: "Apr 19, 2026",
-    },
-    {
-      title: "New recovery area opening",
-      audience: "12 Month members",
-      channel: "Portal",
-      status: "Draft",
-      publishAt: "TBD",
-    },
-  ],
+  revenueTrend: [],
+  checkInTrend: [],
+  branchRevenue: [],
+  planDistribution: [],
+  recentActivity: [],
+  members: [],
+  plans: [],
+  payments: [],
+  attendance: [],
+  retention: [],
+  announcements: [],
 };
 
 function formatCurrency(value: number) {
@@ -326,6 +163,204 @@ const OVERDUE_CUTOFF_MS = 3 * 24 * 60 * 60 * 1000;
 
 function isOverdue(dateStr: string): boolean {
   return Date.now() - new Date(dateStr).getTime() > OVERDUE_CUTOFF_MS;
+}
+
+function startOfLocalDay(date: Date) {
+  const copy = new Date(date);
+  copy.setHours(0, 0, 0, 0);
+  return copy;
+}
+
+function endOfLocalDay(date: Date) {
+  const copy = new Date(date);
+  copy.setHours(23, 59, 59, 999);
+  return copy;
+}
+
+function formatDayLabel(date: Date) {
+  return date.toLocaleDateString("en-US", { weekday: "short" });
+}
+
+function formatMonthLabel(date: Date) {
+  return date.toLocaleDateString("en-US", { month: "short" });
+}
+
+function formatDateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function formatShortDate(date: Date) {
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+export async function getSuperAdminAttendance(): Promise<SuperAdminAttendanceData> {
+  const empty: SuperAdminAttendanceData = {
+    metrics: [
+      { label: "Today's Check-ins", value: "0", detail: "Across all branches" },
+      { label: "Busiest Branch", value: "None", detail: "No visits today" },
+      { label: "Peak Hour", value: "None", detail: "No visits today" },
+      { label: "This Week", value: "0", detail: "Mon-Sun visits" },
+    ],
+    dailyTrend: [],
+    branchSplit: [],
+    rows: [],
+    branchOptions: [],
+  };
+
+  try {
+    const supabase = await createClient();
+    const now = new Date();
+    const todayStart = startOfLocalDay(now);
+    const todayEnd = endOfLocalDay(now);
+    const dayOfWeek = now.getDay();
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const weekStart = startOfLocalDay(now);
+    weekStart.setDate(now.getDate() + mondayOffset);
+    const weekEnd = endOfLocalDay(new Date(weekStart));
+    weekEnd.setDate(weekStart.getDate() + 6);
+
+    const sevenDaysAgo = startOfLocalDay(now);
+    sevenDaysAgo.setDate(now.getDate() - 6);
+
+    const [attendanceResult, branchesResult] = await Promise.all([
+      supabase
+        .from("attendance")
+        .select(`
+          id,
+          user_id,
+          branch_id,
+          check_in_time,
+          profiles!attendance_user_id_fkey(first_name, last_name),
+          branches(name)
+        `)
+        .gte("check_in_time", sevenDaysAgo.toISOString())
+        .lte("check_in_time", todayEnd.toISOString())
+        .order("check_in_time", { ascending: false }),
+      supabase.from("branches").select("id, name").order("name"),
+    ]);
+
+    if (attendanceResult.error || branchesResult.error) {
+      if (attendanceResult.error) console.error("[getSuperAdminAttendance] attendance query failed:", attendanceResult.error);
+      if (branchesResult.error) console.error("[getSuperAdminAttendance] branches query failed:", branchesResult.error);
+      return empty;
+    }
+
+    const attendance = attendanceResult.data ?? [];
+    const allBranches = branchesResult.data ?? [];
+    const todayRows = attendance.filter((row) => {
+      const date = new Date(row.check_in_time);
+      return date >= todayStart && date <= todayEnd;
+    });
+    const weekRows = attendance.filter((row) => {
+      const date = new Date(row.check_in_time);
+      return date >= weekStart && date <= weekEnd;
+    });
+
+    const branchCountsToday = new Map<string, number>();
+    for (const row of todayRows) {
+      const branch = Array.isArray(row.branches) ? row.branches[0] : row.branches;
+      const branchName = branch?.name ?? "Unknown";
+      branchCountsToday.set(branchName, (branchCountsToday.get(branchName) ?? 0) + 1);
+    }
+
+    const busiestBranch = [...branchCountsToday.entries()].sort((a, b) => b[1] - a[1])[0] ?? null;
+
+    const hourlyCounts = new Map<number, number>();
+    for (const row of todayRows) {
+      const hour = new Date(row.check_in_time).getHours();
+      hourlyCounts.set(hour, (hourlyCounts.get(hour) ?? 0) + 1);
+    }
+    const peakHour = [...hourlyCounts.entries()].sort((a, b) => b[1] - a[1])[0] ?? null;
+    const peakHourLabel = peakHour
+      ? new Date(new Date().setHours(peakHour[0], 0, 0, 0)).toLocaleTimeString("en-US", {
+          hour: "numeric",
+        })
+      : "None";
+
+    const dailyTrend = Array.from({ length: 7 }, (_, index) => {
+      const date = startOfLocalDay(sevenDaysAgo);
+      date.setDate(sevenDaysAgo.getDate() + index);
+      const key = formatDateKey(date);
+      const value = attendance.filter((row) => formatDateKey(new Date(row.check_in_time)) === key).length;
+      return {
+        label: formatDayLabel(date),
+        value,
+      };
+    });
+
+    const branchCountsWeek = new Map<string, number>();
+    for (const branch of allBranches) {
+      branchCountsWeek.set(branch.name, 0);
+    }
+    for (const row of weekRows) {
+      const branch = Array.isArray(row.branches) ? row.branches[0] : row.branches;
+      const branchName = branch?.name ?? "Unknown";
+      branchCountsWeek.set(branchName, (branchCountsWeek.get(branchName) ?? 0) + 1);
+    }
+
+    const branchSplit = [...branchCountsWeek.entries()]
+      .map(([branch, value]) => ({ branch, value }))
+      .sort((a, b) => b.value - a.value);
+
+    const rows = attendance.slice(0, 50).map((row) => {
+      const profile = row.profiles as unknown as { first_name?: string | null; last_name?: string | null } | null;
+      const branch = Array.isArray(row.branches) ? row.branches[0] : row.branches;
+      const date = new Date(row.check_in_time);
+
+      return {
+        id: row.id,
+        member: profile ? `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() || "Member" : "Member",
+        branch: branch?.name ?? "Unknown",
+        date: date.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        }),
+        time: date.toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+        }),
+        rawTime: row.check_in_time,
+      };
+    });
+
+    const branchOptions = allBranches.map((branch) => branch.name).sort();
+
+    return {
+      metrics: [
+        {
+          label: "Today's Check-ins",
+          value: todayRows.length.toLocaleString(),
+          detail: "Across all branches",
+        },
+        {
+          label: "Busiest Branch",
+          value: busiestBranch?.[0] ?? "None",
+          detail: busiestBranch ? `${busiestBranch[1]} check-ins today` : "No visits today",
+        },
+        {
+          label: "Peak Hour",
+          value: peakHourLabel,
+          detail: peakHour ? `${peakHour[1]} check-ins today` : "No visits today",
+        },
+        {
+          label: "This Week",
+          value: weekRows.length.toLocaleString(),
+          detail: "Mon-Sun visits",
+        },
+      ],
+      dailyTrend,
+      branchSplit,
+      rows,
+      branchOptions,
+    };
+  } catch (error) {
+    console.error("[getSuperAdminAttendance] Unexpected error:", error);
+    return empty;
+  }
 }
 
 export async function getSuperAdminOverview(): Promise<OverviewData> {
@@ -346,7 +381,7 @@ export async function getSuperAdminOverview(): Promise<OverviewData> {
         .select("id, email, first_name, last_name, role, created_at, branch_id, branches(name)"),
       supabase
         .from("memberships")
-        .select("id, user_id, plan_id, status, created_at, membership_plans(name)")
+        .select("id, user_id, plan_id, status, start_date, end_date, created_at, membership_plans(name, duration)")
         .order("created_at", { ascending: false }),
       supabase
         .from("membership_plans")
@@ -359,7 +394,7 @@ export async function getSuperAdminOverview(): Promise<OverviewData> {
         .from("attendance")
         .select("id, user_id, branch_id, check_in_time, branches(name)")
         .order("check_in_time", { ascending: false })
-        .limit(20),
+        .limit(500),
       supabase
         .from("attendance")
         .select("id", { count: "exact", head: true })
@@ -384,7 +419,7 @@ export async function getSuperAdminOverview(): Promise<OverviewData> {
       if (attendanceResult.error) console.error("[getSuperAdminOverview] attendance query failed:", attendanceResult.error);
       if (todayAttendanceCountResult.error) console.error("[getSuperAdminOverview] today attendance count query failed:", todayAttendanceCountResult.error);
       if (branchesResult.error) console.error("[getSuperAdminOverview] branches query failed:", branchesResult.error);
-      return fallbackData;
+      return emptyOverview;
     }
 
     const profiles = profilesResult.data ?? [];
@@ -494,26 +529,160 @@ export async function getSuperAdminOverview(): Promise<OverviewData> {
       };
     });
 
+    const revenueTrend = Array.from({ length: 6 }, (_, index) => {
+      const date = new Date();
+      date.setDate(1);
+      date.setMonth(date.getMonth() - (5 - index));
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      const value = payments
+        .filter((payment) => {
+          const paymentDate = new Date(payment.created_at);
+          const paymentKey = `${paymentDate.getFullYear()}-${String(paymentDate.getMonth() + 1).padStart(2, "0")}`;
+          return payment.status === "CONFIRMED" && paymentKey === key;
+        })
+        .reduce((total, payment) => total + Number(payment.amount ?? 0), 0);
+
+      return {
+        label: formatMonthLabel(date),
+        value,
+      };
+    });
+
+    const sevenDaysAgo = startOfLocalDay(new Date());
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    const checkInTrend = Array.from({ length: 7 }, (_, index) => {
+      const date = startOfLocalDay(sevenDaysAgo);
+      date.setDate(sevenDaysAgo.getDate() + index);
+      const key = formatDateKey(date);
+      return {
+        label: formatDayLabel(date),
+        value: attendance.filter((item) => formatDateKey(new Date(item.check_in_time)) === key).length,
+      };
+    });
+
+    const branchRevenueMap = new Map<string, number>();
+    for (const branch of branches) {
+      branchRevenueMap.set(branch.name, 0);
+    }
+    for (const payment of payments) {
+      if (payment.status !== "CONFIRMED") continue;
+      const collectionBranch = Array.isArray(payment.branches) ? payment.branches[0] : payment.branches;
+      const branchName = collectionBranch?.name ?? branchNameById.get(payment.branch_id ?? -1) ?? "Unassigned";
+      branchRevenueMap.set(branchName, (branchRevenueMap.get(branchName) ?? 0) + Number(payment.amount ?? 0));
+    }
+    const branchRevenue = [...branchRevenueMap.entries()]
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value);
+
+    const activityItems = [
+      ...payments.slice(0, 10).map((payment) => {
+        const member = profileById.get(payment.user_id);
+        const collectionBranch = Array.isArray(payment.branches) ? payment.branches[0] : payment.branches;
+        return {
+          sortDate: payment.created_at,
+          row: {
+            member: member ? `${member.first_name} ${member.last_name}`.trim() : "Member",
+            branch: collectionBranch?.name ?? branchNameById.get(payment.branch_id ?? -1) ?? "Unassigned",
+            activity: payment.status === "CONFIRMED" ? "Payment confirmed" : "Payment pending",
+            amount: formatCurrency(Number(payment.amount ?? 0)),
+            timestamp: formatShortDate(new Date(payment.created_at)),
+            status: payment.status === "CONFIRMED" ? "success" : "warning",
+          } satisfies ActivityRow,
+        };
+      }),
+      ...attendance.slice(0, 10).map((item) => {
+        const member = profileById.get(item.user_id);
+        const branch = Array.isArray(item.branches) ? item.branches[0] : item.branches;
+        return {
+          sortDate: item.check_in_time,
+          row: {
+            member: member ? `${member.first_name} ${member.last_name}`.trim() : "Member",
+            branch: branch?.name ?? "Branch",
+            activity: "Checked in",
+            timestamp: formatShortDate(new Date(item.check_in_time)),
+            status: "neutral",
+          } satisfies ActivityRow,
+        };
+      }),
+    ];
+    const liveRecentActivity = activityItems
+      .sort((a, b) => new Date(b.sortDate).getTime() - new Date(a.sortDate).getTime())
+      .slice(0, 5)
+      .map((item) => item.row);
+
+    const latestAttendanceByUser = new Map<string, Date>();
+    for (const item of attendance) {
+      if (!latestAttendanceByUser.has(item.user_id)) {
+        latestAttendanceByUser.set(item.user_id, new Date(item.check_in_time));
+      }
+    }
+    const today = startOfLocalDay(new Date());
+    const soon = startOfLocalDay(new Date());
+    soon.setDate(soon.getDate() + 14);
+    const inactiveCutoff = startOfLocalDay(new Date());
+    inactiveCutoff.setDate(inactiveCutoff.getDate() - 14);
+
+    const liveRetention: RetentionRow[] = [];
+    for (const member of liveMembers) {
+      const membership = latestMembershipByUser.get(member.id);
+      const lastVisit = latestAttendanceByUser.get(member.id);
+
+      if (membership?.status === "PENDING") {
+        liveRetention.push({
+          member: member.name,
+          lastVisit: lastVisit ? formatShortDate(lastVisit) : "No visits",
+          risk: "High",
+          trigger: "Pending membership payment",
+          action: "Follow up payment",
+        });
+        continue;
+      }
+
+      if (membership?.status === "ACTIVE" && membership.end_date) {
+        const endDate = startOfLocalDay(new Date(membership.end_date));
+        if (endDate >= today && endDate <= soon) {
+          liveRetention.push({
+            member: member.name,
+            lastVisit: lastVisit ? formatShortDate(lastVisit) : "No visits",
+            risk: "Medium",
+            trigger: `Membership ends ${formatShortDate(endDate)}`,
+            action: "Send renewal reminder",
+          });
+          continue;
+        }
+      }
+
+      if (membership?.status === "ACTIVE" && (!lastVisit || lastVisit < inactiveCutoff)) {
+        liveRetention.push({
+          member: member.name,
+          lastVisit: lastVisit ? formatShortDate(lastVisit) : "No visits",
+          risk: "Medium",
+          trigger: "No check-in in 14 days",
+          action: "Check in with member",
+        });
+      }
+    }
+
     return {
-      ...fallbackData,
+      ...emptyOverview,
       metrics: [
         {
           label: "Active members",
           value: activeMemberIds.size.toLocaleString(),
           delta: `${members.length ? Math.round((activeMemberIds.size / members.length) * 100) : 0}% active`,
-          trend: "up",
+          trend: activeMemberIds.size ? "up" : "neutral",
         },
         {
           label: "Monthly revenue",
           value: formatCurrency(monthlyRevenue || 0),
           delta: `${payments.filter((payment) => payment.status === "CONFIRMED").length} confirmed payments`,
-          trend: "up",
+          trend: monthlyRevenue > 0 ? "up" : "neutral",
         },
         {
           label: "Daily check-ins",
           value: (todayAttendanceCountResult.count ?? 0).toLocaleString(),
           delta: `${branches.length || 1} branches reporting`,
-          trend: "up",
+          trend: (todayAttendanceCountResult.count ?? 0) > 0 ? "up" : "neutral",
         },
         {
           label: "Overdue accounts",
@@ -522,9 +691,12 @@ export async function getSuperAdminOverview(): Promise<OverviewData> {
           trend: overduePayments.length ? "down" : "neutral",
         },
       ],
-      planDistribution: livePlanDistribution.length ? livePlanDistribution : fallbackData.planDistribution,
-      recentActivity: fallbackData.recentActivity,
-      members: liveMembers.length ? liveMembers : fallbackData.members,
+      revenueTrend,
+      checkInTrend,
+      branchRevenue,
+      planDistribution: livePlanDistribution,
+      recentActivity: liveRecentActivity,
+      members: liveMembers,
       plans:
         plans.length > 0
           ? plans.map((plan) => ({
@@ -532,17 +704,17 @@ export async function getSuperAdminOverview(): Promise<OverviewData> {
               tier: "Access",
               price: formatCurrency(Number(plan.price)),
               duration: `${plan.duration} days`,
-              access: "Managed access controls",
+              access: "All branch access",
               status: plan.is_active ? "Active" : "Archived",
             }))
-          : fallbackData.plans,
-      payments: livePayments.length ? livePayments : fallbackData.payments,
-      attendance: liveAttendance.length ? liveAttendance : fallbackData.attendance,
-      retention: fallbackData.retention,
-      announcements: fallbackData.announcements,
+          : [],
+      payments: livePayments,
+      attendance: liveAttendance,
+      retention: liveRetention,
+      announcements: [],
     };
   } catch (error) {
     console.error("[getSuperAdminOverview] Unexpected error:", error);
-    return fallbackData;
+    return emptyOverview;
   }
 }
