@@ -132,6 +132,7 @@ export function ActiveSession({ routineId, routineName, initialExercises }: Acti
   const router = useRouter();
   const startTimeRef = useRef(new Date());
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const finalElapsedRef = useRef<number | null>(null);
 
   const [elapsed, setElapsed] = useState(0);
   const [currentIdx, setCurrentIdx] = useState(0);
@@ -154,13 +155,20 @@ export function ActiveSession({ routineId, routineName, initialExercises }: Acti
   const [saving, setSaving] = useState(false);
   const [exerciseDetail, setExerciseDetail] = useState(false);
 
-  // Stopwatch
+  // Stopwatch – stop when session is finished
   useEffect(() => {
+    if (showSummary || showSticker) {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      return;
+    }
     timerRef.current = setInterval(() => {
       setElapsed(Math.floor((Date.now() - startTimeRef.current.getTime()) / 1000));
     }, 1000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, []);
+  }, [showSummary, showSticker]);
 
   const current = exercises[currentIdx];
   const totalVolume = exercises.reduce(
@@ -196,7 +204,16 @@ export function ActiveSession({ routineId, routineName, initialExercises }: Acti
 
   function nextExercise() {
     if (currentIdx < exercises.length - 1) setCurrentIdx((i) => i + 1);
-    else setShowSummary(true);
+    else {
+      finalElapsedRef.current = elapsed;
+      setShowSummary(true);
+    }
+  }
+
+  // Also capture elapsed when Finish button is pressed directly
+  function handleFinish() {
+    finalElapsedRef.current = elapsed;
+    setShowSummary(true);
   }
 
   function handleBack() {
@@ -230,15 +247,24 @@ export function ActiveSession({ routineId, routineName, initialExercises }: Acti
   }, [exercises, routineId, routineName, totalVolume]);
 
   const completedExCount = exercises.filter((e) => e.sets.some((s) => s.done)).length;
-  const durationMin = Math.floor(elapsed / 60);
+  const displayElapsed = finalElapsedRef.current ?? elapsed;
+  const durationMin = Math.floor(displayElapsed / 60);
+
+  // Stable callback for rest timer dismiss
+  const dismissRest = useCallback(() => setShowRest(false), []);
 
   // Sticker stats overlay
   if (showSticker) {
+    const totalSets = exercises.reduce((acc, ex) => acc + ex.sets.filter((s) => s.done).length, 0);
+    const targetMuscles = [...new Set(exercises.filter((e) => e.sets.some((s) => s.done)).map((e) => e.target).filter(Boolean))];
     return (
       <StickerStats
-        duration={formatTime(elapsed)}
+        duration={formatTime(displayElapsed)}
         volume={totalVolume}
         exerciseCount={completedExCount}
+        totalSets={totalSets}
+        routineName={routineName}
+        targetMuscles={targetMuscles}
         onDone={() => router.push("/dashboard/workouts")}
       />
     );
@@ -258,7 +284,7 @@ export function ActiveSession({ routineId, routineName, initialExercises }: Acti
           </span>
           <span>{currentIdx + 1} / {exercises.length}</span>
         </div>
-        <button onClick={() => setShowSummary(true)}
+        <button onClick={handleFinish}
           className="rounded-xl bg-[#C9973E] px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-black">
           Finish
         </button>
@@ -268,7 +294,7 @@ export function ActiveSession({ routineId, routineName, initialExercises }: Acti
         {/* Stopwatch */}
         <div className="text-center">
           <p className="font-display text-5xl font-black tracking-tight text-foreground">
-            {formatTime(elapsed)}
+            {formatTime(displayElapsed)}
           </p>
           <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
             Session Time
@@ -303,15 +329,19 @@ export function ActiveSession({ routineId, routineName, initialExercises }: Acti
                 {i + 1}
               </span>
               <div className="flex justify-center">
-                <input type="number" value={set.weight}
+                <input type="number" value={set.weight || ""}
+                  placeholder="0"
                   onChange={(e) => updateSet(i, "weight", parseFloat(e.target.value) || 0)}
+                  onFocus={(e) => e.target.select()}
                   disabled={set.done}
                   className={cn("h-8 w-16 rounded-lg border border-input bg-transparent text-center text-[13px]",
                     set.done && "line-through opacity-50")} />
               </div>
               <div className="flex justify-center">
-                <input type="number" value={set.reps}
+                <input type="number" value={set.reps || ""}
+                  placeholder="0"
                   onChange={(e) => updateSet(i, "reps", parseInt(e.target.value) || 0)}
+                  onFocus={(e) => e.target.select()}
                   disabled={set.done}
                   className={cn("h-8 w-16 rounded-lg border border-input bg-transparent text-center text-[13px]",
                     set.done && "line-through opacity-50")} />
@@ -346,7 +376,7 @@ export function ActiveSession({ routineId, routineName, initialExercises }: Acti
       </div>
 
       {/* Rest Timer */}
-      {showRest && <RestTimerOverlay duration={90} onDismiss={() => setShowRest(false)} />}
+      {showRest && <RestTimerOverlay duration={60} onDismiss={dismissRest} />}
 
       {/* Exercise Detail Sheet */}
       <Sheet open={exerciseDetail} onOpenChange={setExerciseDetail}>
@@ -380,7 +410,7 @@ export function ActiveSession({ routineId, routineName, initialExercises }: Acti
           <div className="space-y-5 px-4 pb-6">
             <div className="grid grid-cols-3 gap-3">
               {[
-                { label: "Duration", value: formatTime(elapsed), icon: Timer },
+                { label: "Duration", value: formatTime(displayElapsed), icon: Timer },
                 { label: "Volume", value: `${totalVolume.toLocaleString()}kg`, icon: Volume2 },
                 { label: "Exercises", value: String(completedExCount), icon: Dumbbell },
               ].map((stat) => (
