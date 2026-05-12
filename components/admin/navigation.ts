@@ -4,7 +4,6 @@ import {
   Building2,
   CreditCard,
   LayoutDashboard,
-  LineChart,
   Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -24,7 +23,6 @@ const adminNav: AdminNavItem[] = [
   { href: "/admin/billing", label: "Billing", icon: CreditCard },
   { href: "/admin/attendance", label: "Attendance", icon: Activity },
   { href: "/super-admin/branches", label: "Branches", icon: Building2, roles: ["SUPER_ADMIN"] },
-  { href: "/admin/retention", label: "Retention", icon: LineChart },
   { href: "/admin/announcements", label: "Announcements", icon: BellRing },
 ] as const;
 

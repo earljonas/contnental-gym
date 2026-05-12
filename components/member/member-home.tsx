@@ -9,18 +9,27 @@ import {
   Sparkles,
   ClipboardList,
   ChevronRight,
+  ChevronDown,
   Dumbbell,
   CalendarCheck,
   Megaphone,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CoachChat } from "@/components/member/coach-chat";
 
-/* ─── Types ─── */
 interface WeekDay {
   date: string;
   dayLabel: string;
   hasWorkout: boolean;
+}
+
+interface RecentSession {
+  date: string;
+  routineName: string | null;
+  totalVolume: number;
+  durationMin: number;
+  exercises: { name: string; sets: { weight: number; reps: number }[] }[];
 }
 
 interface MemberHomeProps {
@@ -38,9 +47,9 @@ interface MemberHomeProps {
     body: string;
     publishAt: string;
   }[];
+  recentSessions: RecentSession[];
 }
 
-/* ─── Helpers ─── */
 function getGreeting(): string {
   const h = new Date().getHours();
   if (h < 12) return "Good morning";
@@ -56,7 +65,6 @@ function formatDate(): string {
   });
 }
 
-/* ─── Activity Ring SVG ─── */
 function ActivityRing({
   completed,
   goal,
@@ -79,7 +87,6 @@ function ActivityRing({
         viewBox={"0 0 " + size + " " + size}
         className="-rotate-90"
       >
-        {/* Track */}
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -89,7 +96,6 @@ function ActivityRing({
           strokeWidth={strokeWidth}
           className="text-muted-foreground/20"
         />
-        {/* Progress */}
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -109,7 +115,6 @@ function ActivityRing({
           </linearGradient>
         </defs>
       </svg>
-      {/* Center text */}
       <div className="absolute flex flex-col items-center">
         <span className="font-display text-3xl font-black text-foreground">
           {completed}
@@ -122,7 +127,6 @@ function ActivityRing({
   );
 }
 
-/* ─── Main Component ─── */
 export function MemberHome({
   firstName,
   membershipStatus,
@@ -133,12 +137,14 @@ export function MemberHome({
   weekDays,
   streak,
   announcements,
+  recentSessions,
 }: MemberHomeProps) {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [coachOpen, setCoachOpen] = useState(false);
+  const [announcementsOpen, setAnnouncementsOpen] = useState(false);
 
   const selectedDayInfo = weekDays.find((d) => d.date === selectedDay);
 
-  // Membership pill
   const renderStatusPill = () => {
     if (membershipStatus === "ACTIVE" && daysLeft !== null) {
       const urgent = daysLeft <= 7;
@@ -184,9 +190,7 @@ export function MemberHome({
 
   return (
     <div className="space-y-6">
-      {/* ═══ TOP: Greeting + Status ═══ */}
       <div className="relative">
-        {/* Streak badge — top right */}
         {streak > 0 && (
           <div className="absolute -top-1 right-0 flex items-center gap-1.5 rounded-full bg-orange-500/15 px-3 py-1.5">
             <Flame className="size-3.5 text-orange-500" />
@@ -208,27 +212,49 @@ export function MemberHome({
         <div className="mt-3">{renderStatusPill()}</div>
       </div>
 
-      {/* ═══ EXPIRED / PENDING WARNING BANNER ═══ */}
       {announcements.length > 0 ? (
         <div className="overflow-hidden rounded-2xl border border-border bg-card">
-          <div className="flex items-center gap-2 border-b border-border px-5 py-3">
-            <Megaphone className="size-4 text-[#C9973E]" />
-            <span className="text-[11px] font-medium uppercase tracking-[0.15em] text-muted-foreground">
-              Announcements
-            </span>
-          </div>
-          <div className="divide-y divide-border">
-            {announcements.map((announcement) => (
-              <div key={announcement.id} className="px-5 py-4">
-                <div className="flex items-start justify-between gap-4">
-                  <p className="text-sm font-semibold text-foreground">{announcement.title}</p>
-                  <span className="shrink-0 text-[11px] text-muted-foreground">
-                    {announcement.publishAt}
-                  </span>
-                </div>
-                <p className="mt-1 text-[13px] text-muted-foreground">{announcement.body}</p>
+          <button
+            onClick={() => setAnnouncementsOpen((o) => !o)}
+            className="flex w-full items-center justify-between px-5 py-3 transition-colors hover:bg-muted/50"
+          >
+            <div className="flex items-center gap-2">
+              <Megaphone className="size-4 text-[#C9973E]" />
+              <span className="text-[11px] font-medium uppercase tracking-[0.15em] text-muted-foreground">
+                Announcements
+              </span>
+              <span className="rounded-full bg-[#C9973E]/10 px-2 py-0.5 text-[10px] font-bold text-[#C9973E]">
+                {announcements.length}
+              </span>
+            </div>
+            <ChevronDown
+              className={cn(
+                "size-4 text-muted-foreground transition-transform duration-200",
+                announcementsOpen && "rotate-180"
+              )}
+            />
+          </button>
+          <div
+            className={cn(
+              "grid transition-all duration-300 ease-in-out",
+              announcementsOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+            )}
+          >
+            <div className="overflow-hidden">
+              <div className="divide-y divide-border border-t border-border">
+                {announcements.map((announcement) => (
+                  <div key={announcement.id} className="px-5 py-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <p className="text-sm font-semibold text-foreground">{announcement.title}</p>
+                      <span className="shrink-0 text-[11px] text-muted-foreground">
+                        {announcement.publishAt}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[13px] text-muted-foreground">{announcement.body}</p>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
           </div>
         </div>
       ) : null}
@@ -271,7 +297,6 @@ export function MemberHome({
         </div>
       )}
 
-      {/* ═══ Membership Info Strip (Active) ═══ */}
       {planName && membershipStatus === "ACTIVE" && (
         <Link
           href="/dashboard/profile"
@@ -296,7 +321,6 @@ export function MemberHome({
         </Link>
       )}
 
-      {/* ═══ Quick Action Row ═══ */}
       <div className="grid grid-cols-3 gap-3">
         <Link href="/dashboard/session" className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card px-4 py-5 transition-all hover:bg-muted active:scale-[0.97]">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#C9973E]/10">
@@ -316,7 +340,10 @@ export function MemberHome({
           </span>
         </Link>
 
-        <button className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card px-4 py-5 transition-all hover:bg-muted active:scale-[0.97]">
+        <button
+          onClick={() => setCoachOpen(true)}
+          className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card px-4 py-5 transition-all hover:bg-muted active:scale-[0.97]"
+        >
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#C9973E]/10">
             <Sparkles className="size-5 text-[#C9973E]" />
           </div>
@@ -326,7 +353,21 @@ export function MemberHome({
         </button>
       </div>
 
-      {/* ═══ Today's Focus Card ═══ */}
+      <CoachChat
+        open={coachOpen}
+        onClose={() => setCoachOpen(false)}
+        context={{
+          firstName,
+          membershipStatus,
+          planName,
+          daysLeft,
+          streak,
+          sessionsThisWeek,
+          weeklyGoal,
+          recentSessions,
+        }}
+      />
+
       <div className="overflow-hidden rounded-2xl border border-border bg-card">
         <div className="border-b border-border px-5 py-3">
           <span className="text-[11px] font-medium uppercase tracking-[0.15em] text-muted-foreground">
@@ -360,7 +401,6 @@ export function MemberHome({
         </div>
       </div>
 
-      {/* ═══ Weekly Activity ═══ */}
       <div className="overflow-hidden rounded-2xl border border-border bg-card">
         <div className="border-b border-border px-5 py-3">
           <div className="flex items-center justify-between">
@@ -374,10 +414,8 @@ export function MemberHome({
         </div>
 
         <div className="flex flex-col items-center px-5 py-6">
-          {/* Activity Ring */}
           <ActivityRing completed={sessionsThisWeek} goal={weeklyGoal} />
 
-          {/* 7-day strip */}
           <div className="mt-6 flex w-full justify-between">
             {weekDays.map((day) => {
               const now = new Date();
@@ -424,7 +462,6 @@ export function MemberHome({
             })}
           </div>
 
-          {/* Day detail tooltip */}
           {selectedDay && selectedDayInfo && (
             <div className="mt-4 flex w-full items-center justify-between rounded-xl border border-border bg-muted/30 px-4 py-3">
               <div className="flex items-center gap-3">
@@ -462,7 +499,6 @@ export function MemberHome({
         </div>
       </div>
 
-      {/* ═══ Recent Sessions ═══ */}
       <div className="overflow-hidden rounded-2xl border border-border bg-card">
         <div className="border-b border-border px-5 py-3">
           <span className="text-[11px] font-medium uppercase tracking-[0.15em] text-muted-foreground">

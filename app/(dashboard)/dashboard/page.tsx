@@ -9,7 +9,7 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // ── Profile ──
+  // Profile
   const { data: profile } = await supabase
     .from("profiles")
     .select("first_name, last_name")
@@ -25,7 +25,7 @@ export default async function DashboardPage() {
     membership_plans: { name: string; price: number } | null;
   };
 
-  // ── Latest membership with end_date ──
+  // Latest membership
   const { data: membershipData } = await supabase
     .from("memberships")
     .select("status, start_date, end_date, created_at, plan_id, membership_plans(name, price)")
@@ -35,7 +35,7 @@ export default async function DashboardPage() {
 
   const membership = pickCurrentMembership((membershipData ?? []) as unknown as MembershipWithPlan[]);
 
-  // ── This week's attendance (Mon–Sun) ──
+  // This week's attendance (Mon–Sun)
   const now = new Date();
   const dayOfWeek = now.getDay();
   const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
@@ -54,7 +54,7 @@ export default async function DashboardPage() {
     .lte("check_in_time", weekEnd.toISOString())
     .order("check_in_time", { ascending: true });
 
-  // ── Streak: count consecutive days with check-ins going backwards from today ──
+  // Streak calculation
   const { data: recentAttendance } = await supabase
     .from("attendance")
     .select("check_in_time")
@@ -62,7 +62,6 @@ export default async function DashboardPage() {
     .order("check_in_time", { ascending: false })
     .limit(90);
 
-  // Build a set of unique dates (YYYY-MM-DD) for streak calculation
   const attendanceDates = new Set(
     (recentAttendance ?? []).map((a) =>
       new Date(a.check_in_time).toISOString().split("T")[0]
@@ -71,7 +70,6 @@ export default async function DashboardPage() {
 
   let streak = 0;
   const cursor = new Date();
-  // If the user hasn't checked in today, start from yesterday
   const todayStr = cursor.toISOString().split("T")[0];
   if (!attendanceDates.has(todayStr)) {
     cursor.setDate(cursor.getDate() - 1);
@@ -86,7 +84,7 @@ export default async function DashboardPage() {
     }
   }
 
-  // ── Build week days array ──
+  // Week days array for UI
   const weekDays: { date: string; dayLabel: string; hasWorkout: boolean }[] = [];
   for (let i = 0; i < 7; i++) {
     const d = new Date(weekStart);
@@ -102,7 +100,38 @@ export default async function DashboardPage() {
   const sessionsThisWeek = weekDays.filter((d) => d.hasWorkout).length;
   const announcements = await getMemberAnnouncements(user!.id);
 
-  // ── Membership status info ──
+  // Sessions for AI Coach context
+  const { data: recentSessionsRaw } = await supabase
+    .from("sessions")
+    .select("started_at, ended_at, routine_name, total_volume, exercises")
+    .eq("user_id", user!.id)
+    .order("started_at", { ascending: false })
+    .limit(10);
+
+  const recentSessions = (recentSessionsRaw ?? []).map((s) => {
+    const start = new Date(s.started_at);
+    const end = new Date(s.ended_at);
+    const durationMin = Math.round((end.getTime() - start.getTime()) / 60000);
+    const exercises = Array.isArray(s.exercises) ? s.exercises : [];
+    return {
+      date: start.toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      }),
+      routineName: s.routine_name as string | null,
+      totalVolume: Math.round(s.total_volume ?? 0),
+      durationMin,
+      exercises: exercises.map((ex: { name: string; sets: { weight: number; reps: number }[] }) => ({
+        name: ex.name,
+        sets: (ex.sets ?? []).map((set: { weight: number; reps: number }) => ({
+          weight: set.weight,
+          reps: set.reps,
+        })),
+      })),
+    };
+  });
+
   const plan = membership?.membership_plans;
 
   let daysLeft: number | null = null;
@@ -129,6 +158,7 @@ export default async function DashboardPage() {
         body: announcement.body,
         publishAt: announcement.publishAt,
       }))}
+      recentSessions={recentSessions}
     />
   );
 }

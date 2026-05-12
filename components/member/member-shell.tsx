@@ -81,14 +81,17 @@ export function MemberShell({
             );
           })}
 
-          {/* Center action on sidebar */}
-          <button className="mt-4 flex items-center gap-3 rounded-lg bg-[#C9973E] px-3 py-2.5 text-sm font-medium text-black transition-colors hover:bg-[#B8882F]">
+          {/* Sidebar action */}
+          <Link
+            href="/dashboard/session"
+            className="mt-4 flex items-center gap-3 rounded-lg bg-[#C9973E] px-3 py-2.5 text-sm font-medium text-black transition-colors hover:bg-[#B8882F]"
+          >
             <Plus className="size-5" />
             Quick Add
-          </button>
+          </Link>
         </nav>
 
-        {/* Sidebar footer */}
+        {/* User info */}
         <div className="border-t border-border px-6 py-4">
           <p className="text-sm font-medium text-foreground">{userName}</p>
           <p className="text-[11px] text-muted-foreground">Member</p>
