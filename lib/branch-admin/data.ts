@@ -26,6 +26,7 @@ export type BranchPlanOption = {
 
 export type BranchDashboardData = {
   totalMembers: number;
+  registeredHere: number;
   activeMembers: number;
   todayCheckIns: number;
   pendingActivations: number;
@@ -41,7 +42,8 @@ export async function getBranchDashboard(branchId: number): Promise<BranchDashbo
 
   const [
     allMembersResult,
-    activeMembershipsResult,
+    registeredHereResult,
+    registeredHereProfilesResult,
     todayAttendanceResult,
     pendingResult,
   ] = await Promise.all([
@@ -51,11 +53,19 @@ export async function getBranchDashboard(branchId: number): Promise<BranchDashbo
       .select("id", { count: "exact", head: true })
       .eq("role", "MEMBER"),
 
-    // Active members at this branch
+    // Members whose registration branch is this branch. This does not limit access.
     supabase
-      .from("memberships")
+      .from("profiles")
       .select("id", { count: "exact", head: true })
-      .eq("status", "ACTIVE"),
+      .eq("role", "MEMBER")
+      .eq("branch_id", branchId),
+
+    // Active members registered through this branch. This does not limit access.
+    supabase
+      .from("profiles")
+      .select("id, memberships(status)")
+      .eq("role", "MEMBER")
+      .eq("branch_id", branchId),
 
     // Today's check-ins for this branch
     supabase
@@ -117,7 +127,11 @@ export async function getBranchDashboard(branchId: number): Promise<BranchDashbo
 
   return {
     totalMembers: allMembersResult.count ?? 0,
-    activeMembers: activeMembershipsResult.count ?? 0,
+    registeredHere: registeredHereResult.count ?? 0,
+    activeMembers: (registeredHereProfilesResult.data ?? []).filter((profile) => {
+      const memberships = Array.isArray(profile.memberships) ? profile.memberships : [];
+      return memberships.some((membership) => membership.status === "ACTIVE");
+    }).length,
     todayCheckIns: todayAttendanceResult.data?.length ?? 0,
     pendingActivations: pendingMembers.length,
     recentCheckIns: checkInRows,
@@ -355,6 +369,7 @@ export type MemberRow = {
 export type BranchMembersData = {
   members: MemberRow[];
   totalMembers: number;
+  registeredHereCount: number;
   activeCount: number;
   pendingCount: number;
   expiredCount: number;
@@ -419,7 +434,6 @@ export type MemberDetails = {
 
 export async function getBranchMembers(branchId: number): Promise<BranchMembersData> {
   const supabase = await createClient();
-  void branchId;
 
   const [profilesResult, membershipsResult, attendanceResult] = await Promise.all([
     supabase
@@ -492,6 +506,7 @@ export async function getBranchMembers(branchId: number): Promise<BranchMembersD
   });
 
   const activeCount = members.filter((m) => m.status === "ACTIVE").length;
+  const registeredHereCount = profiles.filter((profile) => profile.branch_id === branchId).length;
   const pendingCount = members.filter((m) => m.status === "PENDING").length;
   const expiredCount = members.filter(
     (m) => m.status === "EXPIRED" || m.status === "CANCELLED"
@@ -502,6 +517,7 @@ export async function getBranchMembers(branchId: number): Promise<BranchMembersD
   return {
     members,
     totalMembers: members.length,
+    registeredHereCount,
     activeCount,
     pendingCount,
     expiredCount,

@@ -990,8 +990,8 @@ export function BranchMembersPage({
   }
 
   const metrics = [
-    { label: "Network Members", value: data.totalMembers, icon: Users },
-    { label: "Active Memberships", value: data.activeCount, icon: Shield },
+    { label: "All Members", value: data.totalMembers, icon: Users },
+    { label: "Registered Here", value: data.registeredHereCount, icon: UserCheck },
     { label: "Pending", value: data.pendingCount, icon: Clock },
     { label: "Expired / Cancelled", value: data.expiredCount, icon: XCircle },
   ];
@@ -1073,7 +1073,7 @@ export function BranchMembersPage({
                       setSearch(event.target.value);
                       setMemberPage(1);
                     }}
-                    placeholder="Search name, email, branch..."
+                    placeholder="Search name, email, registration branch..."
                     className="h-10 w-full rounded-xl border-border bg-background pl-4 text-sm focus:border-[#C9973E] focus:ring-[#C9973E]/20 sm:w-[240px]"
                   />
                   <Select
@@ -1121,7 +1121,7 @@ export function BranchMembersPage({
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
                       <TableHead>Name</TableHead>
-                      <TableHead>Home Branch</TableHead>
+                      <TableHead>Registration Branch</TableHead>
                       <TableHead>Plan</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Joined</TableHead>
