@@ -100,6 +100,23 @@ export default async function DashboardPage() {
   const sessionsThisWeek = weekDays.filter((d) => d.hasWorkout).length;
   const announcements = await getMemberAnnouncements(user!.id);
 
+  const todayRoutineLabel = new Date().toLocaleDateString("en-US", { weekday: "short" });
+  const { data: routinesRaw } = await supabase
+    .from("routines")
+    .select("id, name, days, routine_exercises(id)")
+    .eq("user_id", user!.id)
+    .contains("days", [todayRoutineLabel])
+    .order("created_at", { ascending: false });
+
+  const todaysRoutines = (routinesRaw ?? []).map((routine) => ({
+    id: routine.id,
+    name: routine.name,
+    days: Array.isArray(routine.days) ? routine.days : [],
+    exerciseCount: Array.isArray(routine.routine_exercises)
+      ? routine.routine_exercises.length
+      : 0,
+  }));
+
   // Sessions for AI Coach context
   const { data: recentSessionsRaw } = await supabase
     .from("sessions")
@@ -159,6 +176,7 @@ export default async function DashboardPage() {
         publishAt: announcement.publishAt,
       }))}
       recentSessions={recentSessions}
+      todaysRoutines={todaysRoutines}
     />
   );
 }

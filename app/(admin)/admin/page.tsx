@@ -1,8 +1,15 @@
 import { DashboardPage } from "@/components/admin/dashboard-page";
-import { getSuperAdminOverview } from "@/lib/super-admin/data";
+import { getSuperAdminOverview, type DashboardPeriod } from "@/lib/super-admin/data";
 
-export default async function AdminPage() {
-  const overview = await getSuperAdminOverview();
+export default async function AdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ period?: string }>;
+}) {
+  const params = await searchParams;
+  const period: DashboardPeriod =
+    params.period === "7d" || params.period === "quarter" ? params.period : "30d";
+  const overview = await getSuperAdminOverview(period);
 
   return (
     <DashboardPage
@@ -13,6 +20,8 @@ export default async function AdminPage() {
       planDistribution={overview.planDistribution}
       recentActivity={overview.recentActivity}
       payments={overview.payments}
+      retention={overview.retention}
+      period={period}
     />
   );
 }

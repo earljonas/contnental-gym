@@ -1,12 +1,16 @@
 import { SuperAnnouncementsPage } from "@/components/admin/super-announcements-page";
-import { getSuperAdminAnnouncements } from "@/lib/announcements";
+import { getAnnouncementBranchOptions, getSuperAdminAnnouncements } from "@/lib/announcements";
 
 export default async function AnnouncementsPage() {
-  const announcements = await getSuperAdminAnnouncements();
+  const [announcements, branches] = await Promise.all([
+    getSuperAdminAnnouncements(),
+    getAnnouncementBranchOptions(),
+  ]);
 
   return (
     <SuperAnnouncementsPage
       announcements={announcements}
+      branches={branches}
     />
   );
 }

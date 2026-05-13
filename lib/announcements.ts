@@ -5,7 +5,7 @@ export type AnnouncementItem = {
   title: string;
   body: string;
   audience: string;
-  status: "Draft" | "Sent";
+  status: "Draft" | "Sent" | "Scheduled";
   publishAt: string;
   createdAt: string;
 };
@@ -46,13 +46,14 @@ function formatAnnouncement(
   branchesById: Map<number, string>
 ): AnnouncementItem {
   const publishAt = announcement.publish_at ?? announcement.created_at;
+  const isScheduled = announcement.status === "SENT" && new Date(publishAt) > new Date();
 
   return {
     id: announcement.id,
     title: announcement.title,
     body: announcement.body,
     audience: formatAudience(announcement, branchesById),
-    status: announcement.status === "SENT" ? "Sent" : "Draft",
+    status: isScheduled ? "Scheduled" : announcement.status === "SENT" ? "Sent" : "Draft",
     publishAt: new Date(publishAt).toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
@@ -93,7 +94,15 @@ export async function getSuperAdminAnnouncements(): Promise<AnnouncementItem[]> 
   );
 }
 
-export async function getBranchAnnouncements(): Promise<AnnouncementItem[]> {
+function isAnnouncementVisibleAtBranch(announcement: RawAnnouncement, branchId?: number | null) {
+  if (announcement.status !== "SENT") return false;
+  const publishAt = announcement.publish_at ?? announcement.created_at;
+  if (new Date(publishAt) > new Date()) return false;
+  if (announcement.all_branches || !branchId) return true;
+  return (announcement.audience_branch_ids ?? []).includes(branchId);
+}
+
+export async function getBranchAnnouncements(branchId?: number | null): Promise<AnnouncementItem[]> {
   const supabase = await createClient();
   const [announcementsResult, branches] = await Promise.all([
     supabase
@@ -110,9 +119,13 @@ export async function getBranchAnnouncements(): Promise<AnnouncementItem[]> {
   }
 
   const branchesById = new Map(branches.map((branch) => [branch.id, branch.name]));
-  return (announcementsResult.data ?? []).map((announcement) =>
-    formatAnnouncement(announcement as RawAnnouncement, branchesById)
-  );
+  return (announcementsResult.data ?? [])
+    .filter((announcement) =>
+      isAnnouncementVisibleAtBranch(announcement as RawAnnouncement, branchId)
+    )
+    .map((announcement) =>
+      formatAnnouncement(announcement as RawAnnouncement, branchesById)
+    );
 }
 
 export async function getMemberAnnouncements(userId: string): Promise<AnnouncementItem[]> {
@@ -138,7 +151,11 @@ export async function getMemberAnnouncements(userId: string): Promise<Announceme
   }
 
   const branchesById = new Map(branches.map((branch) => [branch.id, branch.name]));
-  return (announcementsResult.data ?? []).map((announcement) =>
-    formatAnnouncement(announcement as RawAnnouncement, branchesById)
-  );
+  return (announcementsResult.data ?? [])
+    .filter((announcement) =>
+      isAnnouncementVisibleAtBranch(announcement as RawAnnouncement, null)
+    )
+    .map((announcement) =>
+      formatAnnouncement(announcement as RawAnnouncement, branchesById)
+    );
 }

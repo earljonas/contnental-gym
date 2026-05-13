@@ -40,7 +40,16 @@ interface ProgressPageProps {
   sessions: SessionData[];
   bodyMetrics: BodyMetric[];
   totalAttendance: number;
+  initialPersonalRecords?: PersonalRecord[];
 }
+
+type PersonalRecord = {
+  name: string;
+  weight: number;
+  reps: number;
+  date: string;
+  history: { weight: number; reps: number; date: string }[];
+};
 
 /* ─── Achievements ─── */
 const ACHIEVEMENTS = [
@@ -70,7 +79,7 @@ function ChartTooltipContent({ active, payload, label }: { active?: boolean; pay
 }
 
 /* ─── Main ─── */
-export function ProgressPage({ sessions, bodyMetrics, totalAttendance }: ProgressPageProps) {
+export function ProgressPage({ sessions, bodyMetrics, totalAttendance, initialPersonalRecords = [] }: ProgressPageProps) {
   const [chartIdx, setChartIdx] = useState(0);
   const [volumeRange, setVolumeRange] = useState<30 | 90>(30);
   const [selectedExercise, setSelectedExercise] = useState<string>("");
@@ -147,6 +156,7 @@ export function ProgressPage({ sessions, bodyMetrics, totalAttendance }: Progres
 
   // Personal Records
   const personalRecords = useMemo(() => {
+    if (initialPersonalRecords.length > 0) return initialPersonalRecords;
     const prs: Record<string, { weight: number; reps: number; date: string; history: { weight: number; reps: number; date: string }[] }> = {};
     sessions.forEach((s) => {
       (s.exercises ?? []).forEach((ex) => {
@@ -168,7 +178,7 @@ export function ProgressPage({ sessions, bodyMetrics, totalAttendance }: Progres
     return Object.entries(prs)
       .map(([name, data]) => ({ name, ...data }))
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [sessions]);
+  }, [initialPersonalRecords, sessions]);
 
   const totalVolume = sessions.reduce((s, sess) => s + sess.total_volume, 0);
 

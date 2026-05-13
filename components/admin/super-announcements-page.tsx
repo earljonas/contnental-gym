@@ -1,35 +1,50 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { SendHorizonal } from "lucide-react";
+import { SendHorizonal, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { AdminPageTransition } from "@/components/admin/page-transition";
-import { ResourceTable } from "@/components/admin/resource-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import type { AnnouncementItem } from "@/lib/announcements";
-import { sendAnnouncement } from "@/app/(admin)/admin/announcements/actions";
+import type { AnnouncementBranchOption, AnnouncementItem } from "@/lib/announcements";
+import { deleteAnnouncement, sendAnnouncement } from "@/app/(admin)/admin/announcements/actions";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export function SuperAnnouncementsPage({
   announcements,
+  branches,
 }: {
   announcements: AnnouncementItem[];
+  branches: AnnouncementBranchOption[];
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [allBranches, setAllBranches] = useState(true);
+  const [branchIds, setBranchIds] = useState<number[]>([]);
+  const [publishAt, setPublishAt] = useState("");
   const [error, setError] = useState("");
 
   function resetForm() {
     setTitle("");
     setBody("");
+    setAllBranches(true);
+    setBranchIds([]);
+    setPublishAt("");
     setError("");
   }
 
@@ -39,6 +54,9 @@ export function SuperAnnouncementsPage({
       const result = await sendAnnouncement({
         title,
         body,
+        allBranches,
+        branchIds,
+        publishAt: publishAt || undefined,
       });
 
       if (result.error) {
@@ -47,6 +65,27 @@ export function SuperAnnouncementsPage({
       }
 
       resetForm();
+      router.refresh();
+    });
+  }
+
+  function toggleBranch(branchId: number) {
+    setAllBranches(false);
+    setBranchIds((current) =>
+      current.includes(branchId)
+        ? current.filter((id) => id !== branchId)
+        : [...current, branchId]
+    );
+  }
+
+  function handleDelete(announcementId: number) {
+    startTransition(async () => {
+      setError("");
+      const result = await deleteAnnouncement(announcementId);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
       router.refresh();
     });
   }
@@ -78,10 +117,35 @@ export function SuperAnnouncementsPage({
                 <Label className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
                   Audience
                 </Label>
-                <p className="mt-1 text-sm font-semibold text-foreground">Everyone</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Sent to all members and branch admins.
-                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant={allBranches ? "default" : "outline"}
+                    className="h-9 rounded-xl px-3 text-[11px] font-bold uppercase tracking-[0.16em]"
+                    onClick={() => {
+                      setAllBranches(true);
+                      setBranchIds([]);
+                    }}
+                    disabled={isPending}
+                  >
+                    All branches
+                  </Button>
+                  {branches.map((branch) => {
+                    const selected = !allBranches && branchIds.includes(branch.id);
+                    return (
+                      <Button
+                        key={branch.id}
+                        type="button"
+                        variant={selected ? "default" : "outline"}
+                        className="h-9 rounded-xl px-3 text-[11px] font-bold uppercase tracking-[0.16em]"
+                        onClick={() => toggleBranch(branch.id)}
+                        disabled={isPending}
+                      >
+                        {branch.name}
+                      </Button>
+                    );
+                  })}
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -94,6 +158,21 @@ export function SuperAnnouncementsPage({
                   className="min-h-40 rounded-2xl"
                   disabled={isPending}
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="announcement-publish-at">Publish at</Label>
+                <Input
+                  id="announcement-publish-at"
+                  type="datetime-local"
+                  value={publishAt}
+                  onChange={(event) => setPublishAt(event.target.value)}
+                  className="h-11 rounded-2xl"
+                  disabled={isPending}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Leave blank to publish immediately.
+                </p>
               </div>
 
               {error ? (
@@ -122,24 +201,60 @@ export function SuperAnnouncementsPage({
               <Badge variant="secondary">Live</Badge>
             </CardHeader>
             <CardContent>
-              <ResourceTable
-                columns={[
-                  { header: "Title", key: "title" },
-                  { header: "Audience", key: "audience" },
-                  { header: "Status", key: "status" },
-                  { header: "Publish At", key: "publishAt" },
-                ]}
-                rows={announcements}
-                searchPlaceholder="Search title"
-                searchKeys={["title", "audience"]}
-                filters={[
-                  {
-                    key: "status",
-                    label: "Status",
-                    options: ["Sent", "Draft"],
-                  },
-                ]}
-              />
+              {announcements.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-border p-8 text-center md:p-12">
+                  <p className="text-sm font-semibold text-foreground">No announcements yet</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Published and scheduled updates will appear here.</p>
+                </div>
+              ) : (
+                <Table className="min-w-[720px]">
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead>Title</TableHead>
+                      <TableHead>Audience</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Publish At</TableHead>
+                      <TableHead className="text-center">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {announcements.map((announcement) => (
+                      <TableRow key={announcement.id}>
+                        <TableCell className="text-[15px] font-semibold">{announcement.title}</TableCell>
+                        <TableCell className="text-[15px] text-muted-foreground">{announcement.audience}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="secondary"
+                            className={
+                              announcement.status === "Sent"
+                                ? "badge-active"
+                                : announcement.status === "Scheduled"
+                                  ? "badge-pending"
+                                  : ""
+                            }
+                          >
+                            {announcement.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-[15px] text-muted-foreground">{announcement.publishAt}</TableCell>
+                        <TableCell className="text-center">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon-sm"
+                            className="rounded-xl text-red-500 hover:text-red-500"
+                            onClick={() => handleDelete(announcement.id)}
+                            disabled={isPending}
+                            aria-label={`Delete ${announcement.title}`}
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </div>

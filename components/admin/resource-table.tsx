@@ -3,12 +3,13 @@
 import { startTransition, useDeferredValue, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Eye, Menu, RotateCcw, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Eye, Menu, Printer, RotateCcw, Search } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -46,6 +47,56 @@ function statusBadgeClass(value: string) {
   if (normalized === "expired" || normalized === "cancelled") return "badge-expired";
 
   return "";
+}
+
+function csvEscape(value: unknown) {
+  const text = String(value ?? "");
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
+function escapeHtml(value: unknown) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function printPaymentReceipt(row: Record<string, unknown>) {
+  const win = window.open("", "_blank", "width=420,height=640");
+  if (!win) return;
+
+  win.document.write(`
+    <html>
+      <head>
+        <title>Receipt #${escapeHtml(row.id)}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 24px; color: #111; }
+          h1 { font-size: 20px; margin: 0 0 4px; }
+          .muted { color: #666; font-size: 12px; }
+          .line { border-top: 1px solid #ddd; margin: 18px 0; }
+          .row { display: flex; justify-content: space-between; margin: 10px 0; gap: 16px; }
+          .label { color: #666; }
+          .amount { font-size: 24px; font-weight: 700; }
+        </style>
+      </head>
+      <body>
+        <h1>CONTNENTAL FITNESS GYM</h1>
+        <div class="muted">Payment Receipt #${escapeHtml(row.id)}</div>
+        <div class="line"></div>
+        <div class="row"><span class="label">Member</span><strong>${escapeHtml(row.member)}</strong></div>
+        <div class="row"><span class="label">Location</span><span>${escapeHtml(row.branch)}</span></div>
+        <div class="row"><span class="label">Date</span><span>${escapeHtml(row.dueDate)}</span></div>
+        <div class="row"><span class="label">Method</span><span>${escapeHtml(row.method)}</span></div>
+        <div class="row"><span class="label">Status</span><span>${escapeHtml(row.status)}</span></div>
+        <div class="line"></div>
+        <div class="row"><span class="label">Amount paid</span><span class="amount">${escapeHtml(row.amount)}</span></div>
+        <script>window.print();</script>
+      </body>
+    </html>
+  `);
+  win.document.close();
 }
 
 function MemberViewMenu({
@@ -105,7 +156,7 @@ function MemberViewMenu({
   }
 
   return (
-    <div className="flex justify-end">
+    <div className="flex justify-center">
       <Button
         ref={buttonRef}
         type="button"
@@ -155,6 +206,7 @@ export function ResourceTable<T extends Record<string, unknown>>({
   dateKey,
   onPaymentConfirm,
   memberViewPath = "/admin/members",
+  enableExport = true,
 }: {
   columns: Column<T>[];
   rows: T[];
@@ -164,6 +216,7 @@ export function ResourceTable<T extends Record<string, unknown>>({
   dateKey?: keyof T;
   onPaymentConfirm?: (id: number) => Promise<unknown>;
   memberViewPath?: string;
+  enableExport?: boolean;
 }) {
   const [search, setSearch] = useState("");
   const [activeFilters, setActiveFilters] = useState<Record<string, string>>({});
@@ -197,6 +250,25 @@ export function ResourceTable<T extends Record<string, unknown>>({
     setDateFrom("");
     setDateTo("");
     setPage(1);
+  }
+
+  function exportCsv() {
+    const exportColumns = columns.filter((column) => column.key);
+    const headers = exportColumns.map((column) => column.header);
+    const body = filteredRows.map((row) =>
+      exportColumns.map((column) => csvEscape(column.key ? row[column.key] : "")).join(",")
+    );
+    const blob = new Blob([[headers.map(csvEscape).join(","), ...body].join("\n")], {
+      type: "text/csv;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `continental-export-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
   }
 
   let filteredRows = rows.filter((row) => {
@@ -322,6 +394,18 @@ export function ResourceTable<T extends Record<string, unknown>>({
           ) : null}
 
           <div className="flex items-center gap-2">
+            {enableExport ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 px-3 text-xs font-semibold uppercase tracking-[0.16em]"
+                onClick={exportCsv}
+                disabled={filteredRows.length === 0}
+              >
+                <Download className="size-4" />
+                Export
+              </Button>
+            ) : null}
 
             {hasActiveState ? (
               <Button
@@ -341,7 +425,10 @@ export function ResourceTable<T extends Record<string, unknown>>({
         <TableHeader>
           <TableRow className="hover:bg-transparent">
             {columns.map((column, index) => (
-              <TableHead key={column.id ?? (column.key ? String(column.key) : `col-${index}`)}>
+              <TableHead
+                key={column.id ?? (column.key ? String(column.key) : `col-${index}`)}
+                className={column.cellType ? "text-center" : undefined}
+              >
                 {column.header}
               </TableHead>
             ))}
@@ -371,7 +458,10 @@ export function ResourceTable<T extends Record<string, unknown>>({
                   const isMemberView = column.cellType === "member-view";
 
                   return (
-                    <TableCell key={column.id ?? (column.key ? String(column.key) : `col-${columnIndex}`)} className="text-[15px]">
+                    <TableCell
+                      key={column.id ?? (column.key ? String(column.key) : `col-${columnIndex}`)}
+                      className={cn("text-[15px]", column.cellType && "text-center")}
+                    >
                       {isMemberView ? (
                         <MemberViewMenu
                           rowId={row["id"] as string | number}
@@ -382,14 +472,26 @@ export function ResourceTable<T extends Record<string, unknown>>({
                           <a href={`mailto:${value}`}>Email</a>
                         </Button>
                       ) : isPaymentAction ? (
-                        row["status"] === "Pending" ? (
+                        <div className="flex justify-center gap-2">
+                          {row["status"] === "Pending" ? (
+                            <Button
+                              onClick={() => onPaymentConfirm?.(row["id"] as number)}
+                              className="h-9 rounded-xl px-3.5 text-[11px] font-semibold uppercase tracking-[0.16em]"
+                            >
+                              Confirm
+                            </Button>
+                          ) : null}
                           <Button
-                            onClick={() => onPaymentConfirm?.(row["id"] as number)}
-                            className="h-9 rounded-full px-3.5 text-[11px] font-semibold uppercase tracking-[0.16em]"
+                            type="button"
+                            variant="outline"
+                            size="icon-sm"
+                            className="rounded-xl"
+                            onClick={() => printPaymentReceipt(row)}
+                            aria-label="Print receipt"
                           >
-                            Confirm
+                            <Printer className="size-4" />
                           </Button>
-                        ) : null
+                        </div>
                       ) : isStatus ? (
                         <Badge variant="secondary" className={statusBadgeClass(value)}>
                           {value}

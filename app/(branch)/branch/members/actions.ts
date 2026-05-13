@@ -1,9 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { createClient as createSupabaseJsClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getUserRole } from "@/lib/supabase/roles";
+
+function canUseAdminClient() {
+  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+}
 
 export async function manualCheckInFromMembers(memberId: string) {
   try {
@@ -199,80 +204,183 @@ export async function registerWalkInMember(data: {
       return { error: "Selected plan is not available" };
     }
 
-    const admin = createAdminClient();
-    const { data: authData, error: createUserError } =
-      await admin.auth.admin.createUser({
+    if (canUseAdminClient()) {
+      const admin = createAdminClient();
+      const { data: authData, error: createUserError } =
+        await admin.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+          user_metadata: {
+            first_name: firstName,
+            last_name: lastName,
+            phone,
+            role: "MEMBER",
+            branch_id: roleInfo.branch_id,
+          },
+        });
+
+      if (createUserError || !authData.user) {
+        console.error("[registerWalkInMember] auth user creation failed:", createUserError);
+        return { error: createUserError?.message ?? "Failed to create member account" };
+      }
+
+      createdUserId = authData.user.id;
+
+      const { error: profileError } = await admin.from("profiles").upsert({
+        id: createdUserId,
+        email,
+        first_name: firstName,
+        last_name: lastName,
+        phone,
+        role: "MEMBER",
+        branch_id: roleInfo.branch_id,
+        updated_at: new Date().toISOString(),
+      });
+
+      if (profileError) {
+        console.error("[registerWalkInMember] profile upsert failed:", profileError);
+        throw new Error("Failed to create member profile");
+      }
+
+      const today = new Date();
+      const endDate = new Date(today);
+      endDate.setDate(endDate.getDate() + Number(plan.duration));
+
+      const { data: membership, error: membershipError } = await admin
+        .from("memberships")
+        .insert({
+          user_id: createdUserId,
+          plan_id: plan.id,
+          status: "ACTIVE",
+          start_date: today.toISOString().split("T")[0],
+          end_date: endDate.toISOString().split("T")[0],
+        })
+        .select("id")
+        .single();
+
+      if (membershipError || !membership) {
+        console.error("[registerWalkInMember] membership insert failed:", membershipError);
+        throw new Error("Failed to create active membership");
+      }
+
+      const { error: paymentError } = await admin.from("payments").insert({
+        user_id: createdUserId,
+        membership_id: membership.id,
+        branch_id: roleInfo.branch_id,
+        amount: Number(plan.price),
+        payment_method: data.paymentMethod,
+        status: "CONFIRMED",
+        reference_number: referenceNumber,
+        confirmed_by: user.id,
+        confirmed_at: new Date().toISOString(),
+      });
+
+      if (paymentError) {
+        console.error("[registerWalkInMember] payment insert failed:", paymentError);
+        throw new Error("Failed to record payment");
+      }
+    } else {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl || !anonKey) {
+        return { error: "Missing Supabase public environment variables" };
+      }
+
+      const signupClient = createSupabaseJsClient(supabaseUrl, anonKey, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      });
+      const { data: authData, error: signUpError } = await signupClient.auth.signUp({
         email,
         password,
-        email_confirm: true,
-        user_metadata: {
+        options: {
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+            phone,
+            role: "MEMBER",
+            branch_id: roleInfo.branch_id,
+          },
+        },
+      });
+
+      if (signUpError || !authData.user) {
+        console.error("[registerWalkInMember] public signup failed:", signUpError);
+        return { error: signUpError?.message ?? "Failed to create member account" };
+      }
+      if (!authData.session) {
+        return {
+          error:
+            "Member account was created, but email confirmation is enabled. Add SUPABASE_SERVICE_ROLE_KEY to .env.local for instant walk-in activation.",
+        };
+      }
+
+      createdUserId = authData.user.id;
+      const memberClient = createSupabaseJsClient(supabaseUrl, anonKey, {
+        global: {
+          headers: {
+            Authorization: `Bearer ${authData.session.access_token}`,
+          },
+        },
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      });
+
+      await memberClient
+        .from("profiles")
+        .update({
           first_name: firstName,
           last_name: lastName,
           phone,
           role: "MEMBER",
           branch_id: roleInfo.branch_id,
-        },
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", createdUserId);
+
+      const today = new Date();
+      const endDate = new Date(today);
+      endDate.setDate(endDate.getDate() + Number(plan.duration));
+
+      const { data: membership, error: membershipError } = await memberClient
+        .from("memberships")
+        .insert({
+          user_id: createdUserId,
+          plan_id: plan.id,
+          status: "ACTIVE",
+          start_date: today.toISOString().split("T")[0],
+          end_date: endDate.toISOString().split("T")[0],
+        })
+        .select("id")
+        .single();
+
+      if (membershipError || !membership) {
+        console.error("[registerWalkInMember] member membership insert failed:", membershipError);
+        throw new Error("Failed to create active membership");
+      }
+
+      const { error: paymentError } = await supabase.from("payments").insert({
+        user_id: createdUserId,
+        membership_id: membership.id,
+        branch_id: roleInfo.branch_id,
+        amount: Number(plan.price),
+        payment_method: data.paymentMethod,
+        status: "CONFIRMED",
+        reference_number: referenceNumber,
+        confirmed_by: user.id,
+        confirmed_at: new Date().toISOString(),
       });
 
-    if (createUserError || !authData.user) {
-      console.error("[registerWalkInMember] auth user creation failed:", createUserError);
-      return { error: createUserError?.message ?? "Failed to create member account" };
-    }
-
-    createdUserId = authData.user.id;
-
-    const { error: profileError } = await admin.from("profiles").upsert({
-      id: createdUserId,
-      email,
-      first_name: firstName,
-      last_name: lastName,
-      phone,
-      role: "MEMBER",
-      branch_id: roleInfo.branch_id,
-      updated_at: new Date().toISOString(),
-    });
-
-    if (profileError) {
-      console.error("[registerWalkInMember] profile upsert failed:", profileError);
-      throw new Error("Failed to create member profile");
-    }
-
-    const today = new Date();
-    const endDate = new Date(today);
-    endDate.setDate(endDate.getDate() + Number(plan.duration));
-
-    const { data: membership, error: membershipError } = await admin
-      .from("memberships")
-      .insert({
-        user_id: createdUserId,
-        plan_id: plan.id,
-        status: "ACTIVE",
-        start_date: today.toISOString().split("T")[0],
-        end_date: endDate.toISOString().split("T")[0],
-      })
-      .select("id")
-      .single();
-
-    if (membershipError || !membership) {
-      console.error("[registerWalkInMember] membership insert failed:", membershipError);
-      throw new Error("Failed to create active membership");
-    }
-
-    const { error: paymentError } = await admin.from("payments").insert({
-      user_id: createdUserId,
-      membership_id: membership.id,
-      branch_id: roleInfo.branch_id,
-      amount: Number(plan.price),
-      payment_method: data.paymentMethod,
-      status: "CONFIRMED",
-      reference_number: referenceNumber,
-      confirmed_by: user.id,
-      confirmed_at: new Date().toISOString(),
-    });
-
-    if (paymentError) {
-      console.error("[registerWalkInMember] payment insert failed:", paymentError);
-      throw new Error("Failed to record payment");
+      if (paymentError) {
+        console.error("[registerWalkInMember] branch payment insert failed:", paymentError);
+        throw new Error("Failed to record payment");
+      }
     }
 
     revalidatePath("/branch");
@@ -287,7 +395,7 @@ export async function registerWalkInMember(data: {
   } catch (err) {
     console.error("[registerWalkInMember] Unexpected error:", err);
 
-    if (createdUserId) {
+    if (createdUserId && canUseAdminClient()) {
       try {
         await createAdminClient().auth.admin.deleteUser(createdUserId);
       } catch (cleanupError) {

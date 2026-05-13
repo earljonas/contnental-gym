@@ -46,9 +46,6 @@ function AnnouncementCard({
             <Badge variant="outline" className="hidden text-[10px] sm:inline-flex">
               {announcement.audience}
             </Badge>
-            <Badge variant="secondary" className="text-[10px] badge-active">
-              {announcement.status}
-            </Badge>
             {isExpanded ? (
               <ChevronUp className="size-4 text-muted-foreground" />
             ) : (

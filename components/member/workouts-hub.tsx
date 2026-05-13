@@ -291,6 +291,7 @@ function HistoryTab({ sessions }: { sessions: Session[] }) {
 function LibraryTab() {
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [bodyPart, setBodyPart] = useState("all");
   const [bodyParts, setBodyParts] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -307,6 +308,11 @@ function LibraryTab() {
       if (saved) setFavIds(new Set(JSON.parse(saved)));
     });
   }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query), 200);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   useEffect(() => {
     function handleClick(event: MouseEvent) {
@@ -330,8 +336,8 @@ function LibraryTab() {
   }, []);
 
   const results = useMemo(
-    () => (exercises.length ? searchExercises(exercises, query, bodyPart) : []),
-    [bodyPart, exercises, query]
+    () => (exercises.length ? searchExercises(exercises, debouncedQuery, bodyPart) : []),
+    [bodyPart, debouncedQuery, exercises]
   );
   const totalPages = Math.max(1, Math.ceil(results.length / LIBRARY_PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages);
@@ -555,6 +561,7 @@ function CreateRoutineSheet({ open, onClose, editingRoutine }: { open: boolean; 
     { exercise_id: string; exercise_name: string; target_muscle: string; default_sets: number; default_reps: number; default_weight: number }[]
   >([]);
   const [searchQ, setSearchQ] = useState("");
+  const [debouncedSearchQ, setDebouncedSearchQ] = useState("");
   const [allExercises, setAllExercises] = useState<Exercise[]>([]);
   const [searchResults, setSearchResults] = useState<Exercise[]>([]);
   const [saving, setSaving] = useState(false);
@@ -562,6 +569,11 @@ function CreateRoutineSheet({ open, onClose, editingRoutine }: { open: boolean; 
   useEffect(() => {
     if (open) getExercises().then(setAllExercises);
   }, [open]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearchQ(searchQ), 200);
+    return () => clearTimeout(timer);
+  }, [searchQ]);
 
   useEffect(() => {
     if (open && editingRoutine) {
@@ -586,9 +598,9 @@ function CreateRoutineSheet({ open, onClose, editingRoutine }: { open: boolean; 
 
   useEffect(() => {
     if (allExercises.length) {
-      setSearchResults(searchExercises(allExercises, searchQ).slice(0, 10));
+      setSearchResults(searchExercises(allExercises, debouncedSearchQ).slice(0, 10));
     }
-  }, [searchQ, allExercises]);
+  }, [debouncedSearchQ, allExercises]);
 
   function addExercise(ex: Exercise) {
     if (addedExercises.some((a) => a.exercise_id === ex.id)) return;

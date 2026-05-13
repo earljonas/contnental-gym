@@ -11,10 +11,13 @@ import {
   Mail,
   Menu,
   Phone,
+  Printer,
   Shield,
   UserCheck,
   UserPlus,
   Users,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   X,
   XCircle,
@@ -76,6 +79,56 @@ function formatDate(date: string | null | undefined) {
   });
 }
 
+function escapeHtml(value: unknown) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function printMemberPaymentReceipt({
+  member,
+  payment,
+}: {
+  member: string;
+  payment: MemberDetails["payments"][number];
+}) {
+  const win = window.open("", "_blank", "width=420,height=640");
+  if (!win) return;
+
+  win.document.write(`
+    <html>
+      <head>
+        <title>Receipt #${escapeHtml(payment.id)}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 24px; color: #111; }
+          h1 { font-size: 20px; margin: 0 0 4px; }
+          .muted { color: #666; font-size: 12px; }
+          .line { border-top: 1px solid #ddd; margin: 18px 0; }
+          .row { display: flex; justify-content: space-between; margin: 10px 0; gap: 16px; }
+          .label { color: #666; }
+          .amount { font-size: 24px; font-weight: 700; }
+        </style>
+      </head>
+      <body>
+        <h1>CONTNENTAL FITNESS GYM</h1>
+        <div class="muted">Payment Receipt #${escapeHtml(payment.id)}</div>
+        <div class="line"></div>
+        <div class="row"><span class="label">Member</span><strong>${escapeHtml(member)}</strong></div>
+        <div class="row"><span class="label">Date</span><span>${escapeHtml(formatDate(payment.created_at))}</span></div>
+        <div class="row"><span class="label">Method</span><span>${escapeHtml(payment.payment_method)}</span></div>
+        <div class="row"><span class="label">Status</span><span>${escapeHtml(payment.status)}</span></div>
+        <div class="line"></div>
+        <div class="row"><span class="label">Amount paid</span><span class="amount">PHP ${escapeHtml(payment.amount.toLocaleString())}</span></div>
+        <script>window.print();</script>
+      </body>
+    </html>
+  `);
+  win.document.close();
+}
+
 function MemberActionsMenu({
   member,
   isPending,
@@ -93,6 +146,27 @@ function MemberActionsMenu({
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  function getMenuPosition(rect: DOMRect) {
+    const viewportPadding = 12;
+    const menuWidth = 176;
+    const menuHeight = 92;
+    const gap = 8;
+
+    const centeredLeft = rect.left + rect.width / 2 - menuWidth / 2;
+    const left = Math.min(
+      Math.max(viewportPadding, centeredLeft),
+      window.innerWidth - menuWidth - viewportPadding
+    );
+
+    const below = rect.bottom + gap;
+    const top =
+      below + menuHeight > window.innerHeight - viewportPadding
+        ? Math.max(viewportPadding, rect.top - menuHeight - gap)
+        : below;
+
+    return { top, left };
+  }
 
   useEffect(() => {
     function handleClick(event: MouseEvent) {
@@ -129,17 +203,14 @@ function MemberActionsMenu({
   function toggleMenu() {
     const rect = buttonRef.current?.getBoundingClientRect();
     if (rect) {
-      setPosition({
-        top: rect.bottom + 8,
-        left: Math.max(12, rect.right - 176),
-      });
+      setPosition(getMenuPosition(rect));
     }
     setOpen((current) => !current);
   }
 
   return (
     <div
-      className="relative flex justify-end"
+      className="relative flex justify-center"
       onClick={(event) => event.stopPropagation()}
     >
       <Button
@@ -460,9 +531,26 @@ function BranchMemberSheet({
                         via {payment.payment_method} on {formatDate(payment.created_at)}
                       </p>
                     </div>
-                    <Badge variant={payment.status === "CONFIRMED" ? "secondary" : "outline"}>
-                      {payment.status}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={payment.status === "CONFIRMED" ? "secondary" : "outline"}>
+                        {payment.status}
+                      </Badge>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon-sm"
+                        className="rounded-xl"
+                        onClick={() =>
+                          printMemberPaymentReceipt({
+                            member: `${details.profile.first_name} ${details.profile.last_name}`.trim(),
+                            payment,
+                          })
+                        }
+                        aria-label="Print receipt"
+                      >
+                        <Printer className="size-4" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
                 {details.payments.length === 0 ? (
@@ -519,6 +607,7 @@ function RegisterWalkInMemberModal({
   const [planId, setPlanId] = useState(plans[0]?.id.toString() ?? "");
   const [paymentMethod, setPaymentMethod] = useState<"CASH" | "GCASH">("CASH");
   const [referenceNumber, setReferenceNumber] = useState("");
+  const [reviewing, setReviewing] = useState(false);
 
   const selectedPlan = plans.find((plan) => plan.id.toString() === planId) ?? null;
 
@@ -530,6 +619,15 @@ function RegisterWalkInMemberModal({
   function handleSubmit() {
     if (!selectedPlan) {
       setError("Select a membership plan");
+      return;
+    }
+    if (!firstName.trim() || !lastName.trim() || !email.trim() || !password.trim()) {
+      setError("Name, email, and temporary password are required");
+      return;
+    }
+    if (!reviewing) {
+      setError("");
+      setReviewing(true);
       return;
     }
 
@@ -607,9 +705,12 @@ function RegisterWalkInMemberModal({
                 <Input
                   id="walkin-first-name"
                   value={firstName}
-                  onChange={(event) => setFirstName(event.target.value)}
+                  onChange={(event) => {
+                    setFirstName(event.target.value);
+                    setReviewing(false);
+                  }}
                   className="h-11 rounded-xl focus:border-[#C9973E] focus:ring-[#C9973E]/20"
-                  disabled={isPending}
+                  disabled={isPending || reviewing}
                 />
               </div>
               <div className="space-y-2">
@@ -619,9 +720,12 @@ function RegisterWalkInMemberModal({
                 <Input
                   id="walkin-last-name"
                   value={lastName}
-                  onChange={(event) => setLastName(event.target.value)}
+                  onChange={(event) => {
+                    setLastName(event.target.value);
+                    setReviewing(false);
+                  }}
                   className="h-11 rounded-xl focus:border-[#C9973E] focus:ring-[#C9973E]/20"
-                  disabled={isPending}
+                  disabled={isPending || reviewing}
                 />
               </div>
               <div className="space-y-2">
@@ -632,9 +736,12 @@ function RegisterWalkInMemberModal({
                   id="walkin-email"
                   type="email"
                   value={email}
-                  onChange={(event) => setEmail(event.target.value)}
+                  onChange={(event) => {
+                    setEmail(event.target.value);
+                    setReviewing(false);
+                  }}
                   className="h-11 rounded-xl focus:border-[#C9973E] focus:ring-[#C9973E]/20"
-                  disabled={isPending}
+                  disabled={isPending || reviewing}
                 />
               </div>
               <div className="space-y-2">
@@ -644,9 +751,12 @@ function RegisterWalkInMemberModal({
                 <Input
                   id="walkin-phone"
                   value={phone}
-                  onChange={(event) => setPhone(event.target.value)}
+                  onChange={(event) => {
+                    setPhone(event.target.value);
+                    setReviewing(false);
+                  }}
                   className="h-11 rounded-xl focus:border-[#C9973E] focus:ring-[#C9973E]/20"
-                  disabled={isPending}
+                  disabled={isPending || reviewing}
                 />
               </div>
             </div>
@@ -664,9 +774,12 @@ function RegisterWalkInMemberModal({
                 <Select
                   id="walkin-plan"
                   value={planId}
-                  onChange={(event) => setPlanId(event.target.value)}
+                  onChange={(event) => {
+                    setPlanId(event.target.value);
+                    setReviewing(false);
+                  }}
                   className="h-11 rounded-xl focus:border-[#C9973E] focus:ring-[#C9973E]/20"
-                  disabled={isPending || plans.length === 0}
+                  disabled={isPending || reviewing || plans.length === 0}
                 >
                   {plans.map((plan) => (
                     <option key={plan.id} value={plan.id}>
@@ -682,9 +795,12 @@ function RegisterWalkInMemberModal({
                 <Select
                   id="walkin-method"
                   value={paymentMethod}
-                  onChange={(event) => setPaymentMethod(event.target.value as "CASH" | "GCASH")}
+                  onChange={(event) => {
+                    setPaymentMethod(event.target.value as "CASH" | "GCASH");
+                    setReviewing(false);
+                  }}
                   className="h-11 rounded-xl focus:border-[#C9973E] focus:ring-[#C9973E]/20"
-                  disabled={isPending}
+                  disabled={isPending || reviewing}
                 >
                   <option value="CASH">Cash</option>
                   <option value="GCASH">GCash</option>
@@ -698,9 +814,12 @@ function RegisterWalkInMemberModal({
                   <Input
                     id="walkin-reference"
                     value={referenceNumber}
-                    onChange={(event) => setReferenceNumber(event.target.value)}
+                    onChange={(event) => {
+                      setReferenceNumber(event.target.value);
+                      setReviewing(false);
+                    }}
                     className="h-11 rounded-xl focus:border-[#C9973E] focus:ring-[#C9973E]/20"
-                    disabled={isPending}
+                    disabled={isPending || reviewing}
                   />
                 </div>
               ) : null}
@@ -719,9 +838,12 @@ function RegisterWalkInMemberModal({
                 <Input
                   id="walkin-password"
                   value={password}
-                  onChange={(event) => setPassword(event.target.value)}
+                  onChange={(event) => {
+                    setPassword(event.target.value);
+                    setReviewing(false);
+                  }}
                   className="h-11 rounded-xl focus:border-[#C9973E] focus:ring-[#C9973E]/20"
-                  disabled={isPending}
+                  disabled={isPending || reviewing}
                 />
               </div>
               <Button
@@ -729,7 +851,7 @@ function RegisterWalkInMemberModal({
                 variant="outline"
                 className="h-11 self-end rounded-xl"
                 onClick={generatePassword}
-                disabled={isPending}
+                disabled={isPending || reviewing}
               >
                 Generate
               </Button>
@@ -743,7 +865,11 @@ function RegisterWalkInMemberModal({
             <h3 className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
               Summary
             </h3>
-            <div className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+            <div className="mt-4 grid gap-3 text-sm sm:grid-cols-4">
+              <div>
+                <p className="text-xs text-muted-foreground">Member</p>
+                <p className="font-semibold text-foreground">{`${firstName} ${lastName}`.trim() || "Not set"}</p>
+              </div>
               <div>
                 <p className="text-xs text-muted-foreground">Plan</p>
                 <p className="font-semibold text-foreground">{selectedPlan?.name ?? "No plan"}</p>
@@ -755,10 +881,15 @@ function RegisterWalkInMemberModal({
                 </p>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Status</p>
-                <p className="font-semibold text-emerald-500">Active after save</p>
+                <p className="text-xs text-muted-foreground">Payment</p>
+                <p className="font-semibold text-foreground">{paymentMethod}</p>
               </div>
             </div>
+            {reviewing ? (
+              <p className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm font-medium text-amber-500">
+                Review these details before creating the account and activating the membership.
+              </p>
+            ) : null}
           </section>
 
           {error ? (
@@ -772,10 +903,10 @@ function RegisterWalkInMemberModal({
               type="button"
               variant="outline"
               className="h-11 rounded-xl px-5"
-              onClick={onClose}
+              onClick={() => (reviewing ? setReviewing(false) : onClose())}
               disabled={isPending}
             >
-              Cancel
+              {reviewing ? "Back" : "Cancel"}
             </Button>
             <Button
               type="button"
@@ -783,7 +914,7 @@ function RegisterWalkInMemberModal({
               onClick={handleSubmit}
               disabled={isPending || plans.length === 0}
             >
-              {isPending ? "Creating..." : "Create and Activate"}
+              {isPending ? "Creating..." : reviewing ? "Create and Activate" : "Review Registration"}
             </Button>
           </div>
         </div>
@@ -811,6 +942,7 @@ export function BranchMembersPage({
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [planFilter, setPlanFilter] = useState("All");
+  const [memberPage, setMemberPage] = useState(1);
   const [checkInFeedback, setCheckInFeedback] = useState<Feedback>(null);
   const [activatingMember, setActivatingMember] = useState<PendingMember | null>(null);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
@@ -830,6 +962,13 @@ export function BranchMembersPage({
     if (planFilter !== "All" && member.plan !== planFilter) return false;
     return true;
   });
+  const membersPerPage = 10;
+  const memberPageCount = Math.max(1, Math.ceil(filteredMembers.length / membersPerPage));
+  const safeMemberPage = Math.min(memberPage, memberPageCount);
+  const paginatedMembers = filteredMembers.slice(
+    (safeMemberPage - 1) * membersPerPage,
+    safeMemberPage * membersPerPage
+  );
 
   function openMember(memberId: string, mode: "view" | "edit" = "view") {
     router.push(`/branch/members?memberId=${memberId}${mode === "edit" ? "&edit=1" : ""}`);
@@ -851,8 +990,8 @@ export function BranchMembersPage({
   }
 
   const metrics = [
-    { label: "Total Members", value: data.totalMembers, icon: Users },
-    { label: "Active", value: data.activeCount, icon: Shield },
+    { label: "Network Members", value: data.totalMembers, icon: Users },
+    { label: "Active Memberships", value: data.activeCount, icon: Shield },
     { label: "Pending", value: data.pendingCount, icon: Clock },
     { label: "Expired / Cancelled", value: data.expiredCount, icon: XCircle },
   ];
@@ -930,13 +1069,19 @@ export function BranchMembersPage({
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                   <Input
                     value={search}
-                    onChange={(event) => setSearch(event.target.value)}
+                    onChange={(event) => {
+                      setSearch(event.target.value);
+                      setMemberPage(1);
+                    }}
                     placeholder="Search name, email, branch..."
                     className="h-10 w-full rounded-xl border-border bg-background pl-4 text-sm focus:border-[#C9973E] focus:ring-[#C9973E]/20 sm:w-[240px]"
                   />
                   <Select
                     value={statusFilter}
-                    onChange={(event) => setStatusFilter(event.target.value)}
+                    onChange={(event) => {
+                      setStatusFilter(event.target.value);
+                      setMemberPage(1);
+                    }}
                     className="h-10 w-full rounded-xl border-border bg-background text-sm sm:w-[140px]"
                   >
                     <option value="All">All Status</option>
@@ -948,7 +1093,10 @@ export function BranchMembersPage({
                   {data.plans.length > 0 ? (
                     <Select
                       value={planFilter}
-                      onChange={(event) => setPlanFilter(event.target.value)}
+                      onChange={(event) => {
+                        setPlanFilter(event.target.value);
+                        setMemberPage(1);
+                      }}
                       className="h-10 w-full rounded-xl border-border bg-background text-sm sm:w-[140px]"
                     >
                       <option value="All">All Plans</option>
@@ -978,11 +1126,11 @@ export function BranchMembersPage({
                       <TableHead>Status</TableHead>
                       <TableHead>Joined</TableHead>
                       <TableHead>Last Check-in</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="text-center">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredMembers.map((member) => (
+                    {paginatedMembers.map((member) => (
                       <TableRow
                         key={member.id}
                         className="cursor-pointer"
@@ -1010,7 +1158,7 @@ export function BranchMembersPage({
                         </TableCell>
                         <TableCell className="text-[15px] text-muted-foreground">{member.joined}</TableCell>
                         <TableCell className="text-[15px] text-muted-foreground">{member.lastCheckIn}</TableCell>
-                        <TableCell>
+                        <TableCell className="text-center">
                           <MemberActionsMenu
                             member={member}
                             isPending={isPending}
@@ -1024,6 +1172,40 @@ export function BranchMembersPage({
                   </TableBody>
                 </Table>
               )}
+              {filteredMembers.length > membersPerPage ? (
+                <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+                  <p>
+                    Showing {(safeMemberPage - 1) * membersPerPage + 1}-
+                    {Math.min(safeMemberPage * membersPerPage, filteredMembers.length)} of{" "}
+                    {filteredMembers.length}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-10 rounded-xl px-3"
+                      onClick={() => setMemberPage((page) => Math.max(1, page - 1))}
+                      disabled={safeMemberPage === 1}
+                    >
+                      <ChevronLeft className="size-4" />
+                      Previous
+                    </Button>
+                    <span className="min-w-16 text-center text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                      {safeMemberPage}/{memberPageCount}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-10 rounded-xl px-3"
+                      onClick={() => setMemberPage((page) => Math.min(memberPageCount, page + 1))}
+                      disabled={safeMemberPage === memberPageCount}
+                    >
+                      Next
+                      <ChevronRight className="size-4" />
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
         ) : null}
@@ -1055,7 +1237,7 @@ export function BranchMembersPage({
                       <TableHead>Email</TableHead>
                       <TableHead>Plan</TableHead>
                       <TableHead>Registered</TableHead>
-                      <TableHead>Action</TableHead>
+                      <TableHead className="text-center">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1069,7 +1251,7 @@ export function BranchMembersPage({
                           </Badge>
                         </TableCell>
                         <TableCell className="text-[15px] text-muted-foreground">{member.registeredDate}</TableCell>
-                        <TableCell>
+                        <TableCell className="text-center">
                           <Button
                             size="sm"
                             className="h-10 rounded-xl bg-[#C9973E] px-4 text-[10px] font-bold uppercase tracking-wider text-black"

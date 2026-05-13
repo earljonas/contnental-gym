@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import {
-  User, Mail, Phone, Edit3, Save, X, Lock,
-  Bell, Trash2, ChevronDown, CreditCard, Shield,
+  Mail, Phone, Edit3, Save, X, Lock,
+  ChevronDown, CreditCard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -349,31 +349,6 @@ export function ProfilePage({ profile, membership, payments }: ProfilePageProps)
             </div>
           </button>
 
-          {/* Notifications (disabled) */}
-          <div className="flex w-full items-center gap-3 rounded-2xl border border-border bg-card px-4 py-4 opacity-50">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#C9973E]/10">
-              <Bell className="size-4 text-[#C9973E]" />
-            </div>
-            <div className="flex-1">
-              <p className="text-[13px] font-medium text-foreground">Notifications</p>
-              <p className="text-[11px] text-muted-foreground">Coming soon</p>
-            </div>
-            <div className="h-6 w-10 rounded-full bg-muted" />
-          </div>
-
-          {/* Delete Account */}
-          <button
-            onClick={() => alert("Account deletion is not available yet. Contact support.")}
-            className="flex w-full items-center gap-3 rounded-2xl border border-red-500/20 bg-card px-4 py-4 text-left transition-all hover:bg-red-500/5"
-          >
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-500/10">
-              <Trash2 className="size-4 text-red-500" />
-            </div>
-            <div>
-              <p className="text-[13px] font-medium text-red-500">Delete Account</p>
-              <p className="text-[11px] text-muted-foreground">Permanently delete your account and data</p>
-            </div>
-          </button>
         </div>
       </div>
 

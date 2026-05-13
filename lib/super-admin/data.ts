@@ -7,6 +7,8 @@ export type DashboardMetric = {
   trend: "up" | "down" | "neutral";
 };
 
+export type DashboardPeriod = "7d" | "30d" | "quarter";
+
 export type TrendPoint = {
   label: string;
   value: number;
@@ -147,6 +149,40 @@ const emptyOverview: OverviewData = {
   retention: [],
   announcements: [],
 };
+
+function getPeriodWindow(period: DashboardPeriod) {
+  const now = new Date();
+  const end = endOfLocalDay(now);
+  const start = startOfLocalDay(now);
+
+  if (period === "7d") {
+    start.setDate(start.getDate() - 6);
+  } else if (period === "quarter") {
+    start.setMonth(Math.floor(start.getMonth() / 3) * 3, 1);
+  } else {
+    start.setDate(start.getDate() - 29);
+  }
+
+  const previousStart = new Date(start);
+  const previousEnd = new Date(start);
+  previousEnd.setMilliseconds(previousEnd.getMilliseconds() - 1);
+  const windowMs = end.getTime() - start.getTime();
+  previousStart.setTime(previousEnd.getTime() - windowMs);
+
+  return { start, end, previousStart, previousEnd };
+}
+
+function formatPeriodLabel(period: DashboardPeriod) {
+  if (period === "7d") return "last 7 days";
+  if (period === "quarter") return "this quarter";
+  return "last 30 days";
+}
+
+function percentDelta(current: number, previous: number) {
+  if (previous === 0) return current > 0 ? "+100% vs prior period" : "No prior activity";
+  const delta = Math.round(((current - previous) / previous) * 100);
+  return `${delta >= 0 ? "+" : ""}${delta}% vs prior period`;
+}
 
 function formatCurrency(value: number) {
   return `PHP ${Math.round(value).toLocaleString()}`;
@@ -363,9 +399,10 @@ export async function getSuperAdminAttendance(): Promise<SuperAdminAttendanceDat
   }
 }
 
-export async function getSuperAdminOverview(): Promise<OverviewData> {
+export async function getSuperAdminOverview(period: DashboardPeriod = "30d"): Promise<OverviewData> {
   try {
     const supabase = await createClient();
+    const periodWindow = getPeriodWindow(period);
 
     const [
       profilesResult,
@@ -431,15 +468,32 @@ export async function getSuperAdminOverview(): Promise<OverviewData> {
 
     const members = profiles.filter((profile) => profile.role === "MEMBER");
     const activeMemberIds = new Set(memberships.filter((membership) => membership.status === "ACTIVE").map((membership) => membership.user_id));
-    const overduePayments = payments.filter(
-      (payment) => payment.status === "PENDING" && isOverdue(payment.created_at)
+    const previousPeriodPayments = payments.filter(
+      (payment) =>
+        payment.status === "CONFIRMED" &&
+        new Date(payment.created_at) >= periodWindow.previousStart &&
+        new Date(payment.created_at) <= periodWindow.previousEnd
     );
-    const monthStart = new Date();
-    monthStart.setDate(1);
-    monthStart.setHours(0, 0, 0, 0);
     const monthlyRevenue = payments
-      .filter((payment) => payment.status === "CONFIRMED" && new Date(payment.created_at) >= monthStart)
+      .filter((payment) => payment.status === "CONFIRMED" && new Date(payment.created_at) >= periodWindow.start)
       .reduce((total, payment) => total + Number(payment.amount ?? 0), 0);
+    const previousRevenue = previousPeriodPayments.reduce((total, payment) => total + Number(payment.amount ?? 0), 0);
+    const periodAttendance = attendance.filter((item) => {
+      const date = new Date(item.check_in_time);
+      return date >= periodWindow.start && date <= periodWindow.end;
+    });
+    const previousPeriodAttendance = attendance.filter((item) => {
+      const date = new Date(item.check_in_time);
+      return date >= periodWindow.previousStart && date <= periodWindow.previousEnd;
+    });
+    const newMembers = members.filter((member) => {
+      const date = new Date(member.created_at);
+      return date >= periodWindow.start && date <= periodWindow.end;
+    });
+    const previousNewMembers = members.filter((member) => {
+      const date = new Date(member.created_at);
+      return date >= periodWindow.previousStart && date <= periodWindow.previousEnd;
+    });
 
     const branchNameById = new Map<number, string>(branches.map((branch) => [branch.id, branch.name]));
     const latestMembershipByUser = new Map<string, (typeof memberships)[number]>();
@@ -571,6 +625,7 @@ export async function getSuperAdminOverview(): Promise<OverviewData> {
       branchRevenueMap.set(branchName, (branchRevenueMap.get(branchName) ?? 0) + Number(payment.amount ?? 0));
     }
     const branchRevenue = [...branchRevenueMap.entries()]
+      .filter(([, value]) => value > 0)
       .map(([label, value]) => ({ label, value }))
       .sort((a, b) => b.value - a.value);
 
@@ -673,22 +728,22 @@ export async function getSuperAdminOverview(): Promise<OverviewData> {
           trend: activeMemberIds.size ? "up" : "neutral",
         },
         {
-          label: "Monthly revenue",
+          label: "Revenue",
           value: formatCurrency(monthlyRevenue || 0),
-          delta: `${payments.filter((payment) => payment.status === "CONFIRMED").length} confirmed payments`,
-          trend: monthlyRevenue > 0 ? "up" : "neutral",
+          delta: `${formatPeriodLabel(period)} · ${percentDelta(monthlyRevenue, previousRevenue)}`,
+          trend: monthlyRevenue > previousRevenue ? "up" : monthlyRevenue < previousRevenue ? "down" : "neutral",
         },
         {
-          label: "Daily check-ins",
-          value: (todayAttendanceCountResult.count ?? 0).toLocaleString(),
-          delta: `${branches.length || 1} branches reporting`,
-          trend: (todayAttendanceCountResult.count ?? 0) > 0 ? "up" : "neutral",
+          label: "Check-ins",
+          value: periodAttendance.length.toLocaleString(),
+          delta: `${formatPeriodLabel(period)} · ${percentDelta(periodAttendance.length, previousPeriodAttendance.length)}`,
+          trend: periodAttendance.length > previousPeriodAttendance.length ? "up" : periodAttendance.length < previousPeriodAttendance.length ? "down" : "neutral",
         },
         {
-          label: "Overdue accounts",
-          value: overduePayments.length.toLocaleString(),
-          delta: overduePayments.length ? "Needs follow-up" : "On track",
-          trend: overduePayments.length ? "down" : "neutral",
+          label: "New members",
+          value: newMembers.length.toLocaleString(),
+          delta: `${formatPeriodLabel(period)} · ${percentDelta(newMembers.length, previousNewMembers.length)}`,
+          trend: newMembers.length > previousNewMembers.length ? "up" : newMembers.length < previousNewMembers.length ? "down" : "neutral",
         },
       ],
       revenueTrend,

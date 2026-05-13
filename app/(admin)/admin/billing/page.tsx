@@ -1,4 +1,5 @@
 import { ResourcePage } from "@/components/admin/resource-page";
+import { ExportButton } from "@/components/admin/export-button";
 import { getBillingMemberOptions } from "@/lib/branch-admin/data";
 import { getSuperAdminOverview } from "@/lib/super-admin/data";
 import { createClient } from "@/lib/supabase/server";
@@ -26,7 +27,23 @@ export default async function BillingPage() {
         { label: "Overdue", value: overview.payments.filter((item) => item.status === "Overdue").length.toString() },
         { label: "Tracked payments", value: overview.payments.length.toString() },
       ]}
-      headerAction={<RecordPaymentButton members={memberOptions} branches={branches ?? []} />}
+      headerAction={
+        <div className="flex flex-wrap items-center gap-3">
+          <ExportButton
+            rows={overview.payments}
+            columns={[
+              { header: "Member", key: "member" },
+              { header: "Collected At", key: "branch" },
+              { header: "Amount", key: "amount" },
+              { header: "Method", key: "method" },
+              { header: "Payment Date", key: "dueDate" },
+              { header: "Status", key: "status" },
+            ]}
+            filename="contnental-payments"
+          />
+          <RecordPaymentButton members={memberOptions} branches={branches ?? []} />
+        </div>
+      }
       tableTitle="Transactions"
       columns={[
         { header: "Member", key: "member" },
@@ -50,6 +67,7 @@ export default async function BillingPage() {
         { key: "method", label: "Method", options: [...new Set(overview.payments.map((item) => item.method).filter(Boolean))] },
       ]}
       dateKey="dueDate"
+      enableTableExport={false}
     />
   );
 }

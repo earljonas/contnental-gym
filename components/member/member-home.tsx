@@ -32,6 +32,13 @@ interface RecentSession {
   exercises: { name: string; sets: { weight: number; reps: number }[] }[];
 }
 
+interface ScheduledRoutine {
+  id: number;
+  name: string;
+  days: string[];
+  exerciseCount: number;
+}
+
 interface MemberHomeProps {
   firstName: string;
   membershipStatus: string | null;
@@ -48,6 +55,7 @@ interface MemberHomeProps {
     publishAt: string;
   }[];
   recentSessions: RecentSession[];
+  todaysRoutines: ScheduledRoutine[];
 }
 
 function getGreeting(): string {
@@ -138,6 +146,7 @@ export function MemberHome({
   streak,
   announcements,
   recentSessions,
+  todaysRoutines,
 }: MemberHomeProps) {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [coachOpen, setCoachOpen] = useState(false);
@@ -285,7 +294,7 @@ export function MemberHome({
               Membership pending activation
             </p>
             <p className="mt-0.5 text-[12px] text-amber-600/70">
-              Visit any Contnental branch to complete payment.
+              Visit any Continental branch to complete payment.
             </p>
           </div>
           <Link
@@ -376,6 +385,32 @@ export function MemberHome({
         </div>
 
         <div className="px-5 py-6">
+          {todaysRoutines.length > 0 ? (
+            <div className="space-y-3">
+              {todaysRoutines.map((routine) => (
+                <div
+                  key={routine.id}
+                  className="flex flex-col gap-4 rounded-2xl border border-border bg-secondary/30 p-4 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <p className="font-display text-lg font-black uppercase tracking-tight text-foreground">
+                      {routine.name}
+                    </p>
+                    <p className="mt-1 text-[13px] text-muted-foreground">
+                      {routine.exerciseCount} exercise{routine.exerciseCount !== 1 ? "s" : ""} scheduled today
+                    </p>
+                  </div>
+                  <Link
+                    href={`/dashboard/session?routineId=${routine.id}`}
+                    className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#C9973E] px-5 text-[12px] font-semibold uppercase tracking-wider text-black transition-all hover:bg-[#B8882F] active:scale-[0.98]"
+                  >
+                    <Play className="size-4" />
+                    Start
+                  </Link>
+                </div>
+              ))}
+            </div>
+          ) : (
           <div className="flex flex-col items-center text-center">
             <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#C9973E]/10">
               <Dumbbell className="size-7 text-[#C9973E]" />
@@ -398,6 +433,7 @@ export function MemberHome({
               </Link>
             </div>
           </div>
+          )}
         </div>
       </div>
 
@@ -505,10 +541,35 @@ export function MemberHome({
             Recent Sessions
           </span>
         </div>
-        <div className="px-5 py-8 flex flex-col items-center justify-center text-center">
-          <p className="text-[13px] text-muted-foreground">
-            No sessions logged yet. Tap + to log your first workout.
-          </p>
+        <div className="divide-y divide-border">
+          {recentSessions.length > 0 ? (
+            recentSessions.slice(0, 5).map((session, index) => (
+              <div key={`${session.date}-${session.routineName ?? "session"}-${index}`} className="flex items-center justify-between gap-4 px-5 py-4">
+                <div className="min-w-0">
+                  <p className="truncate text-[13px] font-semibold text-foreground">
+                    {session.routineName ?? "Quick Session"}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    {session.date} · {session.exercises.length} exercises
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-[12px] font-semibold text-foreground">
+                    {session.totalVolume.toLocaleString()} kg
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    {session.durationMin} min
+                  </p>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="px-5 py-8 text-center">
+              <p className="text-[13px] text-muted-foreground">
+                No sessions logged yet. Start a workout to build your history.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

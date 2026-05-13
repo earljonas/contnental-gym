@@ -37,7 +37,7 @@ import type {
   MemberLookup,
   SearchableMember,
 } from "@/lib/branch-admin/data";
-import { checkInMember, lookupMemberAction } from "@/app/(branch)/branch/attendance/actions";
+import { checkInMember } from "@/app/(branch)/branch/attendance/actions";
 
 // ── Status feedback config ──
 
@@ -46,6 +46,8 @@ type FeedbackState = {
   member?: MemberLookup;
   message: string;
 };
+
+const SCANNER_STORAGE_KEY = "continental-branch-scanner-enabled";
 
 const feedbackConfig = {
   success: {
@@ -293,7 +295,11 @@ export function BranchAttendancePage({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<FeedbackState>({ type: null, message: "" });
-  const [scannerEnabled, setScannerEnabled] = useState(true);
+  const [scannerEnabled, setScannerEnabled] = useState(() => {
+    if (typeof window === "undefined") return true;
+    const saved = window.localStorage.getItem(SCANNER_STORAGE_KEY);
+    return saved === null ? true : saved === "true";
+  });
   const lastScannedRef = useRef<string>("");
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -382,6 +388,14 @@ export function BranchAttendancePage({
 
   const currentFeedbackConfig = feedback.type ? feedbackConfig[feedback.type] : null;
 
+  function toggleScanner() {
+    setScannerEnabled((enabled) => {
+      const next = !enabled;
+      window.localStorage.setItem(SCANNER_STORAGE_KEY, String(next));
+      return next;
+    });
+  }
+
   return (
     <AdminPageTransition>
       <div className="space-y-8">
@@ -405,7 +419,7 @@ export function BranchAttendancePage({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setScannerEnabled(!scannerEnabled)}
+                onClick={toggleScanner}
                 className="h-9 rounded-full px-4 text-[11px] font-semibold uppercase tracking-[0.12em]"
               >
                 {scannerEnabled ? (

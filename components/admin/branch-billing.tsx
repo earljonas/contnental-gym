@@ -7,6 +7,7 @@ import {
   DollarSign,
   AlertTriangle,
   Clock,
+  Printer,
   X,
 } from "lucide-react";
 import { motion } from "motion/react";
@@ -284,6 +285,51 @@ function statusBadgeClass(status: string) {
   }
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function printReceipt(row: BranchBillingData["rows"][number]) {
+  const win = window.open("", "_blank", "width=420,height=640");
+  if (!win) return;
+
+  win.document.write(`
+    <html>
+      <head>
+        <title>Receipt #${row.id}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 24px; color: #111; }
+          h1 { font-size: 20px; margin: 0 0 4px; }
+          .muted { color: #666; font-size: 12px; }
+          .line { border-top: 1px solid #ddd; margin: 18px 0; }
+          .row { display: flex; justify-content: space-between; margin: 10px 0; gap: 16px; }
+          .label { color: #666; }
+          .amount { font-size: 24px; font-weight: 700; }
+        </style>
+      </head>
+      <body>
+        <h1>CONTNENTAL FITNESS GYM</h1>
+        <div class="muted">Payment Receipt #${row.id}</div>
+        <div class="line"></div>
+        <div class="row"><span class="label">Member</span><strong>${escapeHtml(row.member)}</strong></div>
+        <div class="row"><span class="label">Plan</span><span>${escapeHtml(row.plan)}</span></div>
+        <div class="row"><span class="label">Date</span><span>${escapeHtml(row.date)}</span></div>
+        <div class="row"><span class="label">Method</span><span>${escapeHtml(row.method)}</span></div>
+        <div class="row"><span class="label">Status</span><span>${escapeHtml(row.status)}</span></div>
+        <div class="line"></div>
+        <div class="row"><span class="label">Amount paid</span><span class="amount">${escapeHtml(row.amount)}</span></div>
+        <script>window.print();</script>
+      </body>
+    </html>
+  `);
+  win.document.close();
+}
+
 // ── Main Billing Page ──
 
 export function BranchBillingPage({
@@ -418,6 +464,7 @@ export function BranchBillingPage({
                       <TableHead>Method</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead className="text-center">Receipt</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -454,6 +501,18 @@ export function BranchBillingPage({
                           >
                             {row.status}
                           </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon-sm"
+                            className="rounded-xl"
+                            onClick={() => printReceipt(row)}
+                            aria-label={`Print receipt for ${row.member}`}
+                          >
+                            <Printer className="size-4" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}

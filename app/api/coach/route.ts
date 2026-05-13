@@ -4,6 +4,27 @@ export const dynamic = "force-dynamic";
 
 const OLLAMA_URL = process.env.OLLAMA_URL ?? "http://localhost:11434";
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "llama3.1";
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX_REQUESTS = 10;
+
+const coachRateLimit = new Map<string, { count: number; resetAt: number }>();
+
+function checkRateLimit(userId: string) {
+  const now = Date.now();
+  const current = coachRateLimit.get(userId);
+
+  if (!current || current.resetAt <= now) {
+    coachRateLimit.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return { allowed: true, retryAfter: 0 };
+  }
+
+  if (current.count >= RATE_LIMIT_MAX_REQUESTS) {
+    return { allowed: false, retryAfter: Math.ceil((current.resetAt - now) / 1000) };
+  }
+
+  current.count += 1;
+  return { allowed: true, retryAfter: 0 };
+}
 
 function buildSystemPrompt(context: {
   firstName: string;
@@ -67,6 +88,17 @@ export async function POST(request: Request) {
 
   if (!user) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rateLimit = checkRateLimit(user.id);
+  if (!rateLimit.allowed) {
+    return Response.json(
+      { error: "Too many coach messages. Please wait a moment." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(rateLimit.retryAfter) },
+      }
+    );
   }
 
   const body = await request.json();

@@ -23,9 +23,9 @@ export function BranchDashboardPage({ data }: { data: BranchDashboardData }) {
   const [activatingMember, setActivatingMember] = useState<PendingMember | null>(null);
 
   const metrics = [
-    { label: "Branch Members", value: data.totalMembers.toLocaleString() },
-    { label: "Active Members", value: data.activeMembers.toLocaleString() },
-    { label: "Today's Check-ins", value: data.todayCheckIns.toLocaleString() },
+    { label: "Network Members", value: data.totalMembers.toLocaleString() },
+    { label: "Active Memberships", value: data.activeMembers.toLocaleString() },
+    { label: "Check-ins Here Today", value: data.todayCheckIns.toLocaleString() },
     { label: "Pending Activation", value: data.pendingActivations.toLocaleString() },
   ];
 

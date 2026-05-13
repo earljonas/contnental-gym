@@ -1,4 +1,5 @@
 import { ArrowDownRight, ArrowRight, ArrowUpRight, Sparkles } from "lucide-react";
+import Link from "next/link";
 
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { AdminPageTransition } from "@/components/admin/page-transition";
@@ -11,7 +12,9 @@ import type {
   DashboardMetric,
   DistributionPoint,
   PaymentRow,
+  RetentionRow,
   TrendPoint,
+  DashboardPeriod,
 } from "@/lib/super-admin/data";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +39,8 @@ export function DashboardPage({
   planDistribution,
   recentActivity,
   payments,
+  retention,
+  period,
 }: {
   metrics: DashboardMetric[];
   revenueTrend: TrendPoint[];
@@ -44,11 +49,37 @@ export function DashboardPage({
   planDistribution: DistributionPoint[];
   recentActivity: ActivityRow[];
   payments: PaymentRow[];
+  retention: RetentionRow[];
+  period: DashboardPeriod;
 }) {
+  const periodOptions: { label: string; value: DashboardPeriod }[] = [
+    { label: "7D", value: "7d" },
+    { label: "30D", value: "30d" },
+    { label: "Quarter", value: "quarter" },
+  ];
+
   return (
     <AdminPageTransition>
       <div className="space-y-8">
-        <AdminPageHeader title="Dashboard" />
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <AdminPageHeader title="Dashboard" />
+          <div className="flex w-fit items-center gap-1 rounded-2xl border border-border bg-secondary/30 p-1">
+            {periodOptions.map((option) => (
+              <Link
+                key={option.value}
+                href={option.value === "30d" ? "/admin" : `/admin?period=${option.value}`}
+                className={cn(
+                  "rounded-xl px-4 py-2 text-[11px] font-bold uppercase tracking-[0.16em] transition-colors",
+                  period === option.value
+                    ? "bg-foreground text-background"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {option.label}
+              </Link>
+            ))}
+          </div>
+        </div>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {metrics.map((metric) => (
@@ -117,6 +148,12 @@ export function DashboardPage({
               <div className="rounded-2xl border border-dashed border-border p-8 text-center md:p-12">
                 <p className="text-sm font-semibold text-foreground">No branch revenue yet</p>
                 <p className="mt-1 text-xs text-muted-foreground">Confirmed payments will appear here.</p>
+                <Link
+                  href="/admin/billing"
+                  className="mt-5 inline-flex h-10 items-center rounded-xl bg-[#C9973E] px-4 text-[11px] font-bold uppercase tracking-[0.16em] text-black"
+                >
+                  Review billing
+                </Link>
               </div>
             )}
           </CardContent>
@@ -173,6 +210,50 @@ export function DashboardPage({
             </CardContent>
           </Card>
         </div>
+
+        <Card>
+          <CardHeader className="flex-row items-center justify-between space-y-0">
+            <CardTitle>Retention Watchlist</CardTitle>
+            <Badge variant="outline">Risk</Badge>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {retention.length > 0 ? (
+              retention.slice(0, 5).map((item) => (
+                <div
+                  key={`${item.member}-${item.trigger}`}
+                  className="flex flex-col gap-3 rounded-2xl border border-border bg-secondary/60 p-4 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-semibold text-foreground">{item.member}</p>
+                      <Badge
+                        variant="secondary"
+                        className={
+                          item.risk === "High"
+                            ? "badge-expired"
+                            : item.risk === "Medium"
+                              ? "badge-pending"
+                              : "badge-active"
+                        }
+                      >
+                        {item.risk}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-sm text-muted-foreground">{item.trigger}</p>
+                  </div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    {item.action}
+                  </p>
+                </div>
+              ))
+            ) : (
+              <div className="rounded-2xl border border-dashed border-border p-8 text-center">
+                <p className="text-sm font-semibold text-foreground">No retention risks</p>
+                <p className="mt-1 text-xs text-muted-foreground">Members with expiring or inactive patterns will appear here.</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
