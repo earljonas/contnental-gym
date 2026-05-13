@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { AnnouncementBranchOption, AnnouncementItem } from "@/lib/announcements";
+import { cn } from "@/lib/utils";
 import { deleteAnnouncement, sendAnnouncement } from "@/app/(admin)/admin/announcements/actions";
 import {
   Table,
@@ -38,6 +39,13 @@ export function SuperAnnouncementsPage({
   const [branchIds, setBranchIds] = useState<number[]>([]);
   const [publishAt, setPublishAt] = useState("");
   const [error, setError] = useState("");
+
+  function audienceButtonClass(selected: boolean) {
+    return cn(
+      "h-9 rounded-xl px-3 text-[11px] font-bold uppercase tracking-[0.16em]",
+      selected && "border-primary bg-primary text-primary-foreground shadow-sm"
+    );
+  }
 
   function resetForm() {
     setTitle("");
@@ -70,12 +78,12 @@ export function SuperAnnouncementsPage({
   }
 
   function toggleBranch(branchId: number) {
-    setAllBranches(false);
-    setBranchIds((current) =>
-      current.includes(branchId)
-        ? current.filter((id) => id !== branchId)
-        : [...current, branchId]
-    );
+    const nextBranchIds = branchIds.includes(branchId)
+      ? branchIds.filter((id) => id !== branchId)
+      : [...branchIds, branchId];
+
+    setBranchIds(nextBranchIds);
+    setAllBranches(nextBranchIds.length === 0);
   }
 
   function handleDelete(announcementId: number) {
@@ -121,14 +129,15 @@ export function SuperAnnouncementsPage({
                   <Button
                     type="button"
                     variant={allBranches ? "default" : "outline"}
-                    className="h-9 rounded-xl px-3 text-[11px] font-bold uppercase tracking-[0.16em]"
+                    className={audienceButtonClass(allBranches)}
+                    aria-pressed={allBranches}
                     onClick={() => {
                       setAllBranches(true);
                       setBranchIds([]);
                     }}
                     disabled={isPending}
                   >
-                    All branches
+                    All Branches
                   </Button>
                   {branches.map((branch) => {
                     const selected = !allBranches && branchIds.includes(branch.id);
@@ -137,7 +146,8 @@ export function SuperAnnouncementsPage({
                         key={branch.id}
                         type="button"
                         variant={selected ? "default" : "outline"}
-                        className="h-9 rounded-xl px-3 text-[11px] font-bold uppercase tracking-[0.16em]"
+                        className={audienceButtonClass(selected)}
+                        aria-pressed={selected}
                         onClick={() => toggleBranch(branch.id)}
                         disabled={isPending}
                       >

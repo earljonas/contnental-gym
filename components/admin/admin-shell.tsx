@@ -54,10 +54,10 @@ export function AdminShell({
       <AdminSidebar
         userName={userName}
         role={role}
+        branchName={branchName}
         isCollapsed={isSidebarCollapsed}
         isOpen={isSidebarOpen}
         onToggleCollapse={() => setIsSidebarCollapsed((current) => !current)}
-        onToggleMobile={() => setIsSidebarOpen((current) => !current)}
         onCloseMobile={() => setIsSidebarOpen(false)}
       />
 

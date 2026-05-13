@@ -95,9 +95,6 @@ export function ProfilePage({ profile, membership, payments }: ProfilePageProps)
         <h1 className="font-display text-2xl font-black uppercase tracking-tight text-foreground md:text-3xl">
           Profile
         </h1>
-        <p className="mt-1 text-[13px] text-muted-foreground">
-          Personal info, membership, and settings
-        </p>
       </div>
 
       {/* ═══ Section 1: Personal Info ═══ */}

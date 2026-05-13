@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, PanelLeftClose, PanelLeftOpen, UserRound, X } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, UserRound, X } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useCallback, useRef } from "react";
 
@@ -14,24 +14,26 @@ import { cn } from "@/lib/utils";
 export function AdminSidebar({
   userName,
   role,
+  branchName,
   isCollapsed,
   isOpen,
   onToggleCollapse,
-  onToggleMobile,
   onCloseMobile,
 }: {
   userName: string;
   role: AppRole;
+  branchName?: string;
   isCollapsed: boolean;
   isOpen: boolean;
   onToggleCollapse: () => void;
-  onToggleMobile: () => void;
   onCloseMobile: () => void;
 }) {
   const pathname = usePathname();
   const isBranchAdmin = role === "BRANCH_ADMIN";
   const navItems = isBranchAdmin ? getBranchAdminNav() : getAdminNav(role);
   const homeHref = isBranchAdmin ? "/branch" : "/admin";
+  const roleLabel = isBranchAdmin ? "Branch Admin" : "Super Admin";
+  const roleDetail = isBranchAdmin && branchName ? branchName : "System access";
 
   const isNavActive = useCallback((href: string) => {
     if (href === homeHref) return pathname === homeHref;
@@ -156,10 +158,15 @@ export function AdminSidebar({
             )}
           >
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--sidebar-foreground)]">
-              Account
+              Signed in
             </p>
             {!isCollapsed ? (
-              <p className="mt-2 text-sm font-medium text-[var(--sidebar-foreground-active)]">{userName}</p>
+              <>
+                <p className="mt-2 text-sm font-medium text-[var(--sidebar-foreground-active)]">{userName}</p>
+                <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--sidebar-foreground)]">
+                  {roleLabel} - {roleDetail}
+                </p>
+              </>
             ) : (
               <div className="mt-2 flex justify-center">
                 <UserRound className="size-4 text-[var(--sidebar-foreground)]" />
@@ -217,9 +224,12 @@ export function AdminSidebar({
 
         <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--sidebar-foreground)]">
-            Account
+            Signed in
           </p>
           <p className="mt-2 text-sm font-medium text-[var(--sidebar-foreground-active)]">{userName}</p>
+          <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--sidebar-foreground)]">
+            {roleLabel} - {roleDetail}
+          </p>
         </div>
       </aside>
     </>
