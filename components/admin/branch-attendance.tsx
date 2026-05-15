@@ -587,9 +587,28 @@ export function BranchAttendancePage({
           </CardHeader>
           <CardContent className="p-6">
             {data.log.length === 0 ? (
-              <p className="py-16 text-center text-sm text-muted-foreground">
-                No check-ins {dateFilter ? "on this date" : "today yet"}
-              </p>
+              <div className="rounded-2xl border border-dashed border-border p-8 text-center md:p-12">
+                <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-secondary">
+                  <CalendarDays className="size-7 text-muted-foreground" />
+                </div>
+                <p className="text-sm font-semibold text-foreground">
+                  No check-ins recorded
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {dateFilter
+                    ? "No members checked in on this date."
+                    : "Members will appear here as they check in today."}
+                </p>
+                {dateFilter && (
+                  <button
+                    type="button"
+                    onClick={() => router.push("/branch/attendance")}
+                    className="mt-5 inline-flex h-10 items-center rounded-xl bg-[#C9973E] px-4 text-[11px] font-bold uppercase tracking-[0.16em] text-black"
+                  >
+                    Back to Today
+                  </button>
+                )}
+              </div>
             ) : (
               <Table className="min-w-[480px]">
                 <TableHeader>
