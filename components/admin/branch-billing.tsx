@@ -3,10 +3,15 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  ArrowDownRight,
+  ArrowRight,
+  ArrowUpRight,
   Check,
+  CreditCard,
   DollarSign,
   AlertTriangle,
   Clock,
+  Mail,
   Printer,
   X,
 } from "lucide-react";
@@ -28,8 +33,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { BranchBillingData, BillingMemberOption } from "@/lib/branch-admin/data";
+import type { BranchBillingData, BillingMemberOption, BillingMetric } from "@/lib/branch-admin/data";
 import { recordBranchPayment } from "@/app/(branch)/branch/billing/actions";
+import { cn } from "@/lib/utils";
 
 // ── Record Payment Modal ──
 
@@ -73,7 +79,7 @@ function RecordPaymentModal({
     if (m.planPrice > 0) {
       setAmount(m.planPrice.toString());
     }
-    setError(m.paymentState === "PAYABLE" ? "" : m.note);
+    setError("");
   }
 
   function handleSubmit() {
@@ -343,6 +349,13 @@ export function BranchBillingPage({
   const [statusFilter, setStatusFilter] = useState("All");
   const [methodFilter, setMethodFilter] = useState("All");
   const [showRecordModal, setShowRecordModal] = useState(false);
+  const [remindedIds, setRemindedIds] = useState<Set<number>>(new Set());
+
+  function handleSendReminder(rowId: number, memberName: string) {
+    setRemindedIds((prev) => new Set(prev).add(rowId));
+    // Brief visual feedback — in production this would trigger an email/SMS
+    alert(`Reminder noted for ${memberName}. Follow up manually.`);
+  }
 
   const filteredRows = data.rows.filter((row) => {
     if (search.trim()) {
@@ -359,28 +372,18 @@ export function BranchBillingPage({
     return true;
   });
 
-  const metrics = [
-    {
-      label: "Collected this month",
-      value: data.confirmedThisMonth.toLocaleString(),
-      icon: Check,
-    },
-    {
-      label: "Pending collection",
-      value: data.pendingCollection.toLocaleString(),
-      icon: Clock,
-    },
-    {
-      label: "Overdue",
-      value: data.overdue.toLocaleString(),
-      icon: AlertTriangle,
-    },
-    {
-      label: "Total collected here",
-      value: `PHP ${data.totalCollected.toLocaleString()}`,
-      icon: DollarSign,
-    },
-  ];
+  const metricIcons: Record<string, typeof Check> = {
+    "Collected this month": Check,
+    "Pending collection": Clock,
+    "Overdue": AlertTriangle,
+    "Total collected here": DollarSign,
+  };
+
+  function billingMetricTone(trend: BillingMetric["trend"]) {
+    if (trend === "up") return "text-emerald-600";
+    if (trend === "down") return "text-amber-600";
+    return "text-slate-500";
+  }
 
   return (
     <AdminPageTransition>
@@ -393,21 +396,38 @@ export function BranchBillingPage({
 
         {/* Metric Cards */}
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {metrics.map((metric) => (
-            <Card key={metric.label} className="overflow-hidden rounded-[28px]">
-              <CardHeader className="gap-5 p-6">
-                <div className="flex items-center justify-between">
-                  <CardDescription className="text-[11px] font-semibold uppercase tracking-[0.18em]">
-                    {metric.label}
-                  </CardDescription>
-                  <metric.icon className="size-5 text-muted-foreground" />
-                </div>
-                <CardTitle className="font-display text-[clamp(2rem,3vw,3.4rem)] font-black uppercase leading-none tracking-tight">
-                  {metric.value}
-                </CardTitle>
-              </CardHeader>
-            </Card>
-          ))}
+          {data.metrics.map((metric) => {
+            const Icon = metricIcons[metric.label] ?? DollarSign;
+            return (
+              <Card key={metric.label} className="overflow-hidden rounded-[28px]">
+                <CardHeader className="gap-5 p-6">
+                  <div className="flex items-center justify-between">
+                    <CardDescription className="text-[11px] font-semibold uppercase tracking-[0.18em]">
+                      {metric.label}
+                    </CardDescription>
+                    <Icon className="size-5 text-muted-foreground" />
+                  </div>
+                  <div className="flex min-h-20 flex-col justify-between gap-4">
+                    <CardTitle className="font-display text-[clamp(2rem,3vw,3.4rem)] font-black uppercase leading-none tracking-tight">
+                      {metric.value}
+                    </CardTitle>
+                    <div className="flex items-center gap-2">
+                      <span className={cn("flex items-center gap-1 text-sm font-semibold", billingMetricTone(metric.trend))}>
+                        {metric.trend === "down" ? (
+                          <ArrowDownRight className="size-4" />
+                        ) : metric.trend === "up" ? (
+                          <ArrowUpRight className="size-4" />
+                        ) : (
+                          <ArrowRight className="size-4" />
+                        )}
+                        {metric.delta}
+                      </span>
+                    </div>
+                  </div>
+                </CardHeader>
+              </Card>
+            );
+          })}
         </div>
 
         {/* Transactions Table */}
@@ -450,12 +470,27 @@ export function BranchBillingPage({
           </CardHeader>
           <CardContent className="p-6">
             {filteredRows.length === 0 ? (
-              <p className="py-16 text-center text-sm text-muted-foreground">
-                No transactions found
-              </p>
+              <div className="rounded-2xl border border-dashed border-border p-8 text-center md:p-12">
+                <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-secondary">
+                  <CreditCard className="size-7 text-muted-foreground" />
+                </div>
+                <p className="text-sm font-semibold text-foreground">
+                  No transactions yet
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Payments will appear here once recorded.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowRecordModal(true)}
+                  className="mt-5 inline-flex h-10 items-center rounded-xl bg-[#C9973E] px-4 text-[11px] font-bold uppercase tracking-[0.16em] text-black"
+                >
+                  Record Payment
+                </button>
+              </div>
             ) : (
               <div className="overflow-x-auto">
-                <Table className="min-w-[720px]">
+                <Table className="min-w-[820px]">
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
                       <TableHead>Member</TableHead>
@@ -464,7 +499,7 @@ export function BranchBillingPage({
                       <TableHead>Method</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead className="text-center">Receipt</TableHead>
+                      <TableHead className="text-center">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -503,16 +538,38 @@ export function BranchBillingPage({
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon-sm"
-                            className="rounded-xl"
-                            onClick={() => printReceipt(row)}
-                            aria-label={`Print receipt for ${row.member}`}
-                          >
-                            <Printer className="size-4" />
-                          </Button>
+                          <div className="flex items-center justify-center gap-2">
+                            {row.status === "PENDING" && (
+                              remindedIds.has(row.id) ? (
+                                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">
+                                  <Check className="mr-1 size-3" />
+                                  Reminded
+                                </Badge>
+                              ) : (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 rounded-xl border-amber-500/30 px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-600 hover:bg-amber-500/10"
+                                  onClick={() => handleSendReminder(row.id, row.member)}
+                                  aria-label={`Send reminder for ${row.member}`}
+                                >
+                                  <Mail className="mr-1.5 size-3" />
+                                  Remind
+                                </Button>
+                              )
+                            )}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon-sm"
+                              className="rounded-xl"
+                              onClick={() => printReceipt(row)}
+                              aria-label={`Print receipt for ${row.member}`}
+                            >
+                              <Printer className="size-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}

@@ -119,11 +119,18 @@ export function BranchAnnouncementsFeed({
 
         {announcements.length === 0 ? (
           <Card className="rounded-[30px]">
-            <CardContent className="py-16 text-center">
-              <Megaphone className="mx-auto mb-4 size-10 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
-                No announcements yet
-              </p>
+            <CardContent className="p-0">
+              <div className="rounded-2xl border border-dashed border-border p-8 text-center md:p-12">
+                <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-secondary">
+                  <Megaphone className="size-7 text-muted-foreground" />
+                </div>
+                <p className="text-sm font-semibold text-foreground">
+                  No announcements yet
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Announcements from HQ will appear here when published.
+                </p>
+              </div>
             </CardContent>
           </Card>
         ) : null}

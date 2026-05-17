@@ -24,12 +24,21 @@ export type BranchPlanOption = {
   duration: number;
 };
 
+export type BranchDashboardMetric = {
+  label: string;
+  value: string;
+  delta: string;
+  trend: "up" | "down" | "neutral";
+  href: string;
+};
+
 export type BranchDashboardData = {
   totalMembers: number;
   registeredHere: number;
   activeMembers: number;
   todayCheckIns: number;
   pendingActivations: number;
+  metrics: BranchDashboardMetric[];
   recentCheckIns: BranchCheckIn[];
   pendingMembers: PendingMember[];
 };
@@ -40,11 +49,17 @@ export async function getBranchDashboard(branchId: number): Promise<BranchDashbo
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
+  const yesterdayStart = new Date(todayStart);
+  yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+  const yesterdayEnd = new Date(todayStart);
+  yesterdayEnd.setMilliseconds(-1);
+
   const [
     allMembersResult,
     registeredHereResult,
     registeredHereProfilesResult,
     todayAttendanceResult,
+    yesterdayAttendanceResult,
     pendingResult,
   ] = await Promise.all([
     // Total registered members — all members across all branches
@@ -75,6 +90,14 @@ export async function getBranchDashboard(branchId: number): Promise<BranchDashbo
       .gte("check_in_time", todayStart.toISOString())
       .order("check_in_time", { ascending: false })
       .limit(10),
+
+    // Yesterday's check-ins count for comparison
+    supabase
+      .from("attendance")
+      .select("id", { count: "exact", head: true })
+      .eq("branch_id", branchId)
+      .gte("check_in_time", yesterdayStart.toISOString())
+      .lte("check_in_time", yesterdayEnd.toISOString()),
 
     // Pending activation queue — members with PENDING membership and no branch assignment
     supabase
@@ -125,15 +148,62 @@ export async function getBranchDashboard(branchId: number): Promise<BranchDashbo
       };
     });
 
+  const registeredHere = registeredHereResult.count ?? 0;
+  const activeMembers = (registeredHereProfilesResult.data ?? []).filter((profile) => {
+    const memberships = Array.isArray(profile.memberships) ? profile.memberships : [];
+    return memberships.some((membership) => membership.status === "ACTIVE");
+  }).length;
+  const todayCheckIns = todayAttendanceResult.data?.length ?? 0;
+  const yesterdayCheckIns = yesterdayAttendanceResult.count ?? 0;
+  const pendingActivations = pendingMembers.length;
+  const totalMembers = allMembersResult.count ?? 0;
+
+  // Build trend-aware metrics
+  const checkInDelta = todayCheckIns - yesterdayCheckIns;
+  const activeRate = registeredHere > 0 ? Math.round((activeMembers / registeredHere) * 100) : 0;
+
+  const metrics: BranchDashboardMetric[] = [
+    {
+      label: "Registered Here",
+      value: registeredHere.toLocaleString(),
+      delta: `${totalMembers.toLocaleString()} total across all branches`,
+      trend: "neutral",
+      href: "/branch/members",
+    },
+    {
+      label: "Active Registered",
+      value: activeMembers.toLocaleString(),
+      delta: `${activeRate}% activation rate`,
+      trend: activeRate >= 70 ? "up" : activeRate >= 40 ? "neutral" : "down",
+      href: "/branch/members",
+    },
+    {
+      label: "Check-ins Today",
+      value: todayCheckIns.toLocaleString(),
+      delta: checkInDelta > 0
+        ? `+${checkInDelta} vs yesterday`
+        : checkInDelta < 0
+          ? `${checkInDelta} vs yesterday`
+          : "Same as yesterday",
+      trend: checkInDelta > 0 ? "up" : checkInDelta < 0 ? "down" : "neutral",
+      href: "/branch/attendance",
+    },
+    {
+      label: "Pending Activation",
+      value: pendingActivations.toLocaleString(),
+      delta: pendingActivations > 0 ? `${pendingActivations} need follow-up` : "All caught up",
+      trend: pendingActivations > 0 ? "down" : "up",
+      href: "#pending",
+    },
+  ];
+
   return {
-    totalMembers: allMembersResult.count ?? 0,
-    registeredHere: registeredHereResult.count ?? 0,
-    activeMembers: (registeredHereProfilesResult.data ?? []).filter((profile) => {
-      const memberships = Array.isArray(profile.memberships) ? profile.memberships : [];
-      return memberships.some((membership) => membership.status === "ACTIVE");
-    }).length,
-    todayCheckIns: todayAttendanceResult.data?.length ?? 0,
-    pendingActivations: pendingMembers.length,
+    totalMembers,
+    registeredHere,
+    activeMembers,
+    todayCheckIns,
+    pendingActivations,
+    metrics,
     recentCheckIns: checkInRows,
     pendingMembers,
   };
@@ -592,6 +662,13 @@ export type BillingRow = {
   status: string;
 };
 
+export type BillingMetric = {
+  label: string;
+  value: string;
+  delta: string;
+  trend: "up" | "down" | "neutral";
+};
+
 export type BranchBillingData = {
   rows: BillingRow[];
   confirmedThisMonth: number;
@@ -599,6 +676,7 @@ export type BranchBillingData = {
   overdue: number;
   totalCollected: number;
   methods: string[];
+  metrics: BillingMetric[];
 };
 
 export type BillingMemberOption = {
@@ -640,6 +718,9 @@ export async function getBranchBilling(branchId: number): Promise<BranchBillingD
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastMonthEnd = new Date(monthStart);
+  lastMonthEnd.setMilliseconds(-1);
   const threeDaysAgo = new Date();
   threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
 
@@ -695,6 +776,45 @@ export async function getBranchBilling(branchId: number): Promise<BranchBillingD
 
   const methods = [...new Set(rows.map((r) => r.method).filter(Boolean))];
 
+  // Last month confirmed count for trend comparison
+  const lastMonthConfirmed = (payments ?? []).filter((p) => {
+    const d = new Date(p.created_at);
+    return p.status === "CONFIRMED" && d >= lastMonthStart && d <= lastMonthEnd;
+  }).length;
+
+  const confirmedDelta = confirmedThisMonth - lastMonthConfirmed;
+
+  const metrics: BillingMetric[] = [
+    {
+      label: "Collected this month",
+      value: confirmedThisMonth.toLocaleString(),
+      delta: confirmedDelta > 0
+        ? `+${confirmedDelta} vs last month`
+        : confirmedDelta < 0
+          ? `${confirmedDelta} vs last month`
+          : "Same as last month",
+      trend: confirmedDelta > 0 ? "up" : confirmedDelta < 0 ? "down" : "neutral",
+    },
+    {
+      label: "Pending collection",
+      value: pendingCollection.toLocaleString(),
+      delta: pendingCollection > 0 ? `${pendingCollection} need follow-up` : "All collected",
+      trend: pendingCollection > 0 ? "down" : "up",
+    },
+    {
+      label: "Overdue",
+      value: overdue.toLocaleString(),
+      delta: overdue > 0 ? "Action required" : "On track",
+      trend: overdue > 0 ? "down" : "up",
+    },
+    {
+      label: "Total collected here",
+      value: `PHP ${totalCollected.toLocaleString()}`,
+      delta: `${confirmedThisMonth} payments this month`,
+      trend: totalCollected > 0 ? "up" : "neutral",
+    },
+  ];
+
   return {
     rows,
     confirmedThisMonth,
@@ -702,6 +822,7 @@ export async function getBranchBilling(branchId: number): Promise<BranchBillingD
     overdue,
     totalCollected,
     methods,
+    metrics,
   };
 }
 

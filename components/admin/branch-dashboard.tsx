@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { UserPlus } from "lucide-react";
+import Link from "next/link";
+import { ArrowDownRight, ArrowRight, ArrowUpRight, UserCheck, UserPlus } from "lucide-react";
 
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { AdminPageTransition } from "@/components/admin/page-transition";
@@ -16,18 +17,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { BranchDashboardData, PendingMember } from "@/lib/branch-admin/data";
+import type { BranchDashboardData, BranchDashboardMetric, PendingMember } from "@/lib/branch-admin/data";
 import { ActivateModal } from "@/app/(branch)/branch/activate-modal";
+import { cn } from "@/lib/utils";
+
+function metricTone(trend: BranchDashboardMetric["trend"]) {
+  if (trend === "up") return "text-emerald-600";
+  if (trend === "down") return "text-amber-600";
+  return "text-slate-500";
+}
 
 export function BranchDashboardPage({ data }: { data: BranchDashboardData }) {
   const [activatingMember, setActivatingMember] = useState<PendingMember | null>(null);
-
-  const metrics = [
-    { label: "Registered Here", value: data.registeredHere.toLocaleString() },
-    { label: "Active Registered", value: data.activeMembers.toLocaleString() },
-    { label: "Check-ins Here Today", value: data.todayCheckIns.toLocaleString() },
-    { label: "Pending Activation", value: data.pendingActivations.toLocaleString() },
-  ];
 
   return (
     <AdminPageTransition>
@@ -36,18 +37,55 @@ export function BranchDashboardPage({ data }: { data: BranchDashboardData }) {
 
         {/* Metric Cards */}
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {metrics.map((metric) => (
-            <Card key={metric.label} className="overflow-hidden rounded-[28px]">
-              <CardHeader className="gap-5 p-6">
-                <CardDescription className="text-[11px] font-semibold uppercase tracking-[0.18em]">
-                  {metric.label}
-                </CardDescription>
-                <CardTitle className="font-display text-[clamp(2.5rem,3vw,3.4rem)] font-black uppercase leading-none tracking-tight">
-                  {metric.value}
-                </CardTitle>
-              </CardHeader>
-            </Card>
-          ))}
+          {data.metrics.map((metric) => {
+            const isAnchor = metric.href.startsWith("#");
+
+            const cardContent = (
+              <Card
+                className={cn(
+                  "overflow-hidden rounded-[28px] transition-colors",
+                  !isAnchor && "hover:bg-secondary/30",
+                )}
+              >
+                <CardHeader className="gap-5 p-6">
+                  <CardDescription className="text-[11px] font-semibold uppercase tracking-[0.18em]">
+                    {metric.label}
+                  </CardDescription>
+                  <div className="flex min-h-20 flex-col justify-between gap-4">
+                    <CardTitle className="font-display text-[clamp(2.5rem,3vw,3.4rem)] font-black uppercase leading-none tracking-tight">
+                      {metric.value}
+                    </CardTitle>
+                    <div className="flex items-center gap-2">
+                      <span className={cn("flex items-center gap-1 text-sm font-semibold", metricTone(metric.trend))}>
+                        {metric.trend === "down" ? (
+                          <ArrowDownRight className="size-4" />
+                        ) : metric.trend === "up" ? (
+                          <ArrowUpRight className="size-4" />
+                        ) : (
+                          <ArrowRight className="size-4" />
+                        )}
+                        {metric.delta}
+                      </span>
+                    </div>
+                  </div>
+                </CardHeader>
+              </Card>
+            );
+
+            if (isAnchor) {
+              return (
+                <a key={metric.label} href={metric.href} className="block">
+                  {cardContent}
+                </a>
+              );
+            }
+
+            return (
+              <Link key={metric.label} href={metric.href} className="block">
+                {cardContent}
+              </Link>
+            );
+          })}
         </div>
 
         {/* Two-column layout for check-ins and pending queue */}
@@ -59,9 +97,23 @@ export function BranchDashboardPage({ data }: { data: BranchDashboardData }) {
             </CardHeader>
             <CardContent className="p-6">
               {data.recentCheckIns.length === 0 ? (
-                <p className="py-12 text-center text-sm text-muted-foreground">
-                  No check-ins today yet
-                </p>
+                <div className="rounded-2xl border border-dashed border-border p-8 text-center md:p-12">
+                  <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-secondary">
+                    <UserCheck className="size-7 text-muted-foreground" />
+                  </div>
+                  <p className="text-sm font-semibold text-foreground">
+                    No check-ins today
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Members will appear here as they scan their QR codes.
+                  </p>
+                  <Link
+                    href="/branch/attendance"
+                    className="mt-5 inline-flex h-10 items-center rounded-xl bg-[#C9973E] px-4 text-[11px] font-bold uppercase tracking-[0.16em] text-black"
+                  >
+                    Go to Attendance
+                  </Link>
+                </div>
               ) : (
                 <Table>
                   <TableHeader>
@@ -84,7 +136,7 @@ export function BranchDashboardPage({ data }: { data: BranchDashboardData }) {
           </Card>
 
           {/* Pending Activation Queue */}
-          <Card className="rounded-[30px]">
+          <Card className="rounded-[30px]" id="pending">
             <CardHeader className="flex-row items-center justify-between space-y-0 border-b border-border/70 p-6">
               <CardTitle>Pending Activation</CardTitle>
               <Badge variant="secondary" className="badge-pending">
@@ -93,9 +145,23 @@ export function BranchDashboardPage({ data }: { data: BranchDashboardData }) {
             </CardHeader>
             <CardContent className="p-6">
               {data.pendingMembers.length === 0 ? (
-                <p className="py-12 text-center text-sm text-muted-foreground">
-                  No pending activations
-                </p>
+                <div className="rounded-2xl border border-dashed border-border p-8 text-center md:p-12">
+                  <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-emerald-500/10">
+                    <UserPlus className="size-7 text-emerald-500" />
+                  </div>
+                  <p className="text-sm font-semibold text-foreground">
+                    All caught up!
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    New walk-in registrations will appear here.
+                  </p>
+                  <Link
+                    href="/branch/members"
+                    className="mt-5 inline-flex h-10 items-center rounded-xl bg-[#C9973E] px-4 text-[11px] font-bold uppercase tracking-[0.16em] text-black"
+                  >
+                    Register Walk-in
+                  </Link>
+                </div>
               ) : (
                 <div className="space-y-3">
                   {data.pendingMembers.map((member) => (
