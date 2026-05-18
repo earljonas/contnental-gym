@@ -95,22 +95,6 @@ export function Coaches() {
                     quality={80}
                   />
                 </div>
-                {/* Hover overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-end p-8">
-                  <div className="text-white">
-                    <p className="label-caps mb-2 text-gold" style={{ fontSize: "10px" }}>
-                      CONNECT
-                    </p>
-                    <div className="flex gap-4 text-[13px]">
-                      <a href="#" className="text-white/80 hover:text-gold transition-colors duration-200">
-                        Instagram
-                      </a>
-                      <a href="#" className="text-white/80 hover:text-gold transition-colors duration-200">
-                        Facebook
-                      </a>
-                    </div>
-                  </div>
-                </div>
               </div>
 
               {/* Info */}

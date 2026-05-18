@@ -46,6 +46,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      data-scroll-behavior="smooth"
       className={`${barlowCondensed.variable} ${dmSans.variable} h-full antialiased`}
     >
       <body className="font-body text-text-primary bg-background min-h-full flex flex-col">

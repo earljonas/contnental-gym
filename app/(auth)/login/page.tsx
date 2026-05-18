@@ -121,14 +121,7 @@ export default function LoginPage() {
               )}
             </button>
           </div>
-          <div className="flex justify-end">
-            <button
-              type="button"
-              className="text-[11px] uppercase tracking-[0.1em] text-text-secondary transition-colors hover:text-white"
-            >
-              Forgot Password
-            </button>
-          </div>
+
         </div>
 
         <button
