@@ -12,7 +12,6 @@ import type {
   DashboardMetric,
   DistributionPoint,
   PaymentRow,
-  RetentionRow,
   TrendPoint,
   DashboardPeriod,
 } from "@/lib/super-admin/data";
@@ -36,20 +35,22 @@ export function DashboardPage({
   revenueTrend,
   checkInTrend,
   branchRevenue,
+  branchCheckIns,
+  topPerformingBranch,
   planDistribution,
   recentActivity,
   payments,
-  retention,
   period,
 }: {
   metrics: DashboardMetric[];
   revenueTrend: TrendPoint[];
   checkInTrend: TrendPoint[];
   branchRevenue: DistributionPoint[];
+  branchCheckIns: DistributionPoint[];
+  topPerformingBranch: string;
   planDistribution: DistributionPoint[];
   recentActivity: ActivityRow[];
   payments: PaymentRow[];
-  retention: RetentionRow[];
   period: DashboardPeriod;
 }) {
   const periodOptions: { label: string; value: DashboardPeriod }[] = [
@@ -81,7 +82,7 @@ export function DashboardPage({
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           {metrics.map((metric) => (
             <Card key={metric.label} className="overflow-hidden rounded-[28px]">
               <CardHeader className="gap-5 p-6">
@@ -136,28 +137,58 @@ export function DashboardPage({
           </Card>
         </div>
 
-        <Card>
-          <CardHeader className="flex-row items-center justify-between space-y-0">
-            <CardTitle>Revenue by Branch</CardTitle>
-            <Badge variant="secondary">Finance</Badge>
-          </CardHeader>
-          <CardContent>
-            {branchRevenue.length > 0 ? (
-              <DistributionBarChart data={branchRevenue} />
-            ) : (
-              <div className="rounded-2xl border border-dashed border-border p-8 text-center md:p-12">
-                <p className="text-sm font-semibold text-foreground">No branch revenue yet</p>
-                <p className="mt-1 text-xs text-muted-foreground">Confirmed payments will appear here.</p>
-                <Link
-                  href="/admin/billing"
-                  className="mt-5 inline-flex h-10 items-center rounded-xl bg-[#C9973E] px-4 text-[11px] font-bold uppercase tracking-[0.16em] text-black"
-                >
-                  Review billing
-                </Link>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <div className="grid gap-6 xl:grid-cols-[1fr_1fr_0.7fr]">
+          <Card>
+            <CardHeader className="flex-row items-center justify-between space-y-0">
+              <CardTitle>Revenue by Branch</CardTitle>
+              <Badge variant="secondary">Finance</Badge>
+            </CardHeader>
+            <CardContent>
+              {branchRevenue.length > 0 ? (
+                <DistributionBarChart data={branchRevenue} />
+              ) : (
+                <div className="rounded-2xl border border-dashed border-border p-8 text-center md:p-12">
+                  <p className="text-sm font-semibold text-foreground">No branch revenue yet</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Confirmed payments will appear here.</p>
+                  <Link
+                    href="/admin/billing"
+                    className="mt-5 inline-flex h-10 items-center rounded-xl bg-[#C9973E] px-4 text-[11px] font-bold uppercase tracking-[0.16em] text-black"
+                  >
+                    Review billing
+                  </Link>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex-row items-center justify-between space-y-0">
+              <CardTitle>Check-ins by Branch</CardTitle>
+              <Badge variant="outline">Today</Badge>
+            </CardHeader>
+            <CardContent>
+              {branchCheckIns.some((branch) => branch.value > 0) ? (
+                <DistributionBarChart data={branchCheckIns} />
+              ) : (
+                <div className="rounded-2xl border border-dashed border-border p-8 text-center md:p-12">
+                  <p className="text-sm font-semibold text-foreground">No check-ins today</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Branch visits will appear as members check in.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardDescription className="text-[11px] font-semibold uppercase tracking-[0.18em]">
+                Top Performing Branch
+              </CardDescription>
+              <CardTitle className="font-display text-[clamp(2.2rem,3vw,3rem)] font-black uppercase leading-none tracking-tight">
+                {topPerformingBranch}
+              </CardTitle>
+            </CardHeader>
+          </Card>
+        </div>
 
         <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
           <Card>
@@ -210,50 +241,6 @@ export function DashboardPage({
             </CardContent>
           </Card>
         </div>
-
-        <Card>
-          <CardHeader className="flex-row items-center justify-between space-y-0">
-            <CardTitle>Retention Watchlist</CardTitle>
-            <Badge variant="outline">Risk</Badge>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {retention.length > 0 ? (
-              retention.slice(0, 5).map((item) => (
-                <div
-                  key={`${item.member}-${item.trigger}`}
-                  className="flex flex-col gap-3 rounded-2xl border border-border bg-secondary/60 p-4 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-semibold text-foreground">{item.member}</p>
-                      <Badge
-                        variant="secondary"
-                        className={
-                          item.risk === "High"
-                            ? "badge-expired"
-                            : item.risk === "Medium"
-                              ? "badge-pending"
-                              : "badge-active"
-                        }
-                      >
-                        {item.risk}
-                      </Badge>
-                    </div>
-                    <p className="mt-1 text-sm text-muted-foreground">{item.trigger}</p>
-                  </div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    {item.action}
-                  </p>
-                </div>
-              ))
-            ) : (
-              <div className="rounded-2xl border border-dashed border-border p-8 text-center">
-                <p className="text-sm font-semibold text-foreground">No retention risks</p>
-                <p className="mt-1 text-xs text-muted-foreground">Members with expiring or inactive patterns will appear here.</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
 
         <Card>
           <CardHeader>

@@ -67,7 +67,7 @@ export async function getMemberDetails(memberId: string) {
   // Basic profile
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, first_name, last_name, email, phone, avatar_url, role, created_at")
+    .select("id, first_name, last_name, email, phone, avatar_url, role, created_at, branch_id, branches(name)")
     .eq("id", memberId)
     .single();
 
@@ -76,7 +76,7 @@ export async function getMemberDetails(memberId: string) {
     .from("memberships")
     .select(`
       id, status, start_date, created_at, end_date,
-      membership_plans ( name, tier )
+      membership_plans ( name, price, duration, features )
     `)
     .eq("user_id", memberId)
     .order("created_at", { ascending: false });
@@ -84,7 +84,7 @@ export async function getMemberDetails(memberId: string) {
   // Payments
   const { data: payments } = await supabase
     .from("payments")
-    .select("id, amount, status, payment_method, created_at")
+    .select("id, amount, status, payment_method, reference_number, created_at, branches(name), memberships(membership_plans(name))")
     .eq("user_id", memberId)
     .order("created_at", { ascending: false })
     .limit(10);

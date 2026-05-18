@@ -33,9 +33,11 @@ export default async function MembersPage({
             columns={[
               { header: "Name", key: "name" },
               { header: "Email", key: "email" },
-              { header: "Home Branch", key: "branch" },
+              { header: "Registration Branch / Home Branch", key: "branch" },
               { header: "Plan", key: "plan" },
               { header: "Status", key: "status" },
+              { header: "Expiry Date", key: "expiryDate" },
+              { header: "Last Check-in", key: "lastCheckIn" },
               { header: "Joined", key: "joined" },
             ]}
             filename="contnental-members"
@@ -43,12 +45,12 @@ export default async function MembersPage({
         }
         tableTitle="Directory"
         columns={[
-          { header: "Name", key: "name" },
-          { header: "Email", key: "email" },
-          { header: "Home Branch", key: "branch" },
-          { header: "Plan", key: "plan" },
-          { header: "Status", key: "status" },
-          { header: "Joined", key: "joined" },
+          { header: "Member Name", key: "name" },
+          { header: "Membership Status", key: "status" },
+          { header: "Membership Plan", key: "plan" },
+          { header: "Expiry Date", key: "expiryDate" },
+          { header: "Registration Branch / Home Branch", key: "branch" },
+          { header: "Last Check-in", key: "lastCheckIn" },
           {
             header: "Actions",
             id: "actions",
@@ -61,6 +63,7 @@ export default async function MembersPage({
         searchKeys={["name", "email", "plan"]}
         filters={[
           { key: "status", label: "Status", options: ["Active", "Pending", "At Risk", "Inactive"] },
+          { key: "branch", label: "Branch", options: [...new Set(overview.members.map((item) => item.branch))] },
           { key: "plan", label: "Plan", options: [...new Set(overview.members.map((item) => item.plan))] },
         ]}
         dateKey="joined"

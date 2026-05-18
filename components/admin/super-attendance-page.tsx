@@ -10,9 +10,12 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { Eye, X } from "lucide-react";
 
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { AdminPageTransition } from "@/components/admin/page-transition";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -25,6 +28,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { SuperAdminAttendanceData } from "@/lib/super-admin/data";
+
+type AttendanceRow = SuperAdminAttendanceData["rows"][number];
 
 type ChartTooltipPayload = {
   value: number;
@@ -66,6 +71,8 @@ function EmptyChart({ message }: { message: string }) {
 export function SuperAttendancePage({ data }: { data: SuperAdminAttendanceData }) {
   const [search, setSearch] = useState("");
   const [branchFilter, setBranchFilter] = useState("All");
+  const [dateFilter, setDateFilter] = useState("");
+  const [selectedRow, setSelectedRow] = useState<AttendanceRow | null>(null);
 
   const filteredRows = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -79,9 +86,10 @@ export function SuperAttendancePage({ data }: { data: SuperAdminAttendanceData }
 
       if (!matchesSearch) return false;
       if (branchFilter !== "All" && row.branch !== branchFilter) return false;
+      if (dateFilter && row.rawTime.slice(0, 10) !== dateFilter) return false;
       return true;
     });
-  }, [branchFilter, data.rows, search]);
+  }, [branchFilter, data.rows, dateFilter, search]);
 
   return (
     <AdminPageTransition>
@@ -167,7 +175,7 @@ export function SuperAttendancePage({ data }: { data: SuperAdminAttendanceData }
                 <Input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search member, branch, date..."
+                  placeholder="Search member..."
                   className="h-10 rounded-xl focus:border-[#C9973E] focus:ring-[#C9973E]/20 sm:w-64"
                 />
                 <Select
@@ -182,6 +190,13 @@ export function SuperAttendancePage({ data }: { data: SuperAdminAttendanceData }
                     </option>
                   ))}
                 </Select>
+                <Input
+                  type="date"
+                  value={dateFilter}
+                  onChange={(event) => setDateFilter(event.target.value)}
+                  className="h-10 rounded-xl focus:border-[#C9973E] focus:ring-[#C9973E]/20 sm:w-40"
+                  aria-label="Filter attendance date"
+                />
               </div>
             </div>
           </CardHeader>
@@ -193,13 +208,15 @@ export function SuperAttendancePage({ data }: { data: SuperAdminAttendanceData }
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <Table className="min-w-[640px]">
+                <Table className="min-w-[820px]">
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
                       <TableHead>Member</TableHead>
-                      <TableHead>Branch</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Time</TableHead>
+                      <TableHead>Check-in Branch</TableHead>
+                      <TableHead>Check-in Time</TableHead>
+                      <TableHead>Registration Branch / Home Branch</TableHead>
+                      <TableHead>Membership Status</TableHead>
+                      <TableHead className="text-center">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -207,8 +224,25 @@ export function SuperAttendancePage({ data }: { data: SuperAdminAttendanceData }
                       <TableRow key={row.id}>
                         <TableCell className="text-[15px] font-semibold text-foreground">{row.member}</TableCell>
                         <TableCell className="text-[15px] text-muted-foreground">{row.branch}</TableCell>
-                        <TableCell className="text-[15px] text-muted-foreground">{row.date}</TableCell>
-                        <TableCell className="text-[15px] text-muted-foreground">{row.time}</TableCell>
+                        <TableCell className="text-[15px] text-muted-foreground">{row.date} {row.time}</TableCell>
+                        <TableCell className="text-[15px] text-muted-foreground">{row.homeBranch}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className={row.membershipStatus === "ACTIVE" ? "badge-active" : row.membershipStatus === "PENDING" ? "badge-pending" : "badge-expired"}>
+                            {row.membershipStatus}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon-sm"
+                            className="rounded-xl"
+                            onClick={() => setSelectedRow(row)}
+                            aria-label={`View attendance for ${row.member}`}
+                          >
+                            <Eye className="size-4" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -218,6 +252,62 @@ export function SuperAttendancePage({ data }: { data: SuperAdminAttendanceData }
           </CardContent>
         </Card>
       </div>
+
+      {selectedRow ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm"
+          onClick={() => setSelectedRow(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="attendance-detail-title"
+            className="w-full max-w-xl rounded-3xl border border-border bg-background"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-border bg-card p-6">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                  Attendance Details
+                </p>
+                <h2 id="attendance-detail-title" className="mt-2 font-display text-3xl font-black uppercase leading-none tracking-tight">
+                  {selectedRow.member}
+                </h2>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                className="rounded-xl"
+                onClick={() => setSelectedRow(null)}
+                aria-label="Close attendance details"
+              >
+                <X className="size-4" />
+              </Button>
+            </div>
+            <div className="grid gap-4 p-6 sm:grid-cols-2">
+              <div className="rounded-2xl border border-border bg-card p-5">
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Check-in Branch</p>
+                <p className="mt-1 text-sm font-bold text-foreground">{selectedRow.branch}</p>
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-5">
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Check-in Time</p>
+                <p className="mt-1 text-sm font-bold text-foreground">{selectedRow.date} {selectedRow.time}</p>
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-5">
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Registration Branch</p>
+                <p className="mt-1 text-sm font-bold text-foreground">{selectedRow.homeBranch}</p>
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-5">
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Membership Status</p>
+                <Badge variant="secondary" className={selectedRow.membershipStatus === "ACTIVE" ? "badge-active" : selectedRow.membershipStatus === "PENDING" ? "badge-pending" : "badge-expired"}>
+                  {selectedRow.membershipStatus}
+                </Badge>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </AdminPageTransition>
   );
 }

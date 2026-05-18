@@ -31,6 +31,7 @@ export function ResourcePage<T extends Record<string, unknown>>({
   headerAction,
   onPaymentConfirm,
   memberViewPath,
+  paymentViewPath,
   enableTableExport,
 }: {
   title: string;
@@ -52,6 +53,7 @@ export function ResourcePage<T extends Record<string, unknown>>({
   headerAction?: React.ReactNode;
   onPaymentConfirm?: (id: number) => Promise<unknown>;
   memberViewPath?: string;
+  paymentViewPath?: string;
   enableTableExport?: boolean;
 }) {
   return (
@@ -109,6 +111,7 @@ export function ResourcePage<T extends Record<string, unknown>>({
               dateKey={dateKey}
               onPaymentConfirm={onPaymentConfirm}
               memberViewPath={memberViewPath}
+              paymentViewPath={paymentViewPath}
               enableExport={enableTableExport}
             />
           </CardContent>

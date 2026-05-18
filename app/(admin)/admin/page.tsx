@@ -17,10 +17,11 @@ export default async function AdminPage({
       revenueTrend={overview.revenueTrend}
       checkInTrend={overview.checkInTrend}
       branchRevenue={overview.branchRevenue}
+      branchCheckIns={overview.branchCheckIns}
+      topPerformingBranch={overview.topPerformingBranch}
       planDistribution={overview.planDistribution}
       recentActivity={overview.recentActivity}
       payments={overview.payments}
-      retention={overview.retention}
       period={period}
     />
   );

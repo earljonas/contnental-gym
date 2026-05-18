@@ -185,3 +185,32 @@ export async function recordPayment(formData: {
     return { error: "Unexpected error occurred" };
   }
 }
+
+export async function getPaymentDetails(paymentId: number) {
+  const supabase = await createClient();
+  const auth = await requireSuperAdmin(supabase);
+  if (auth.error) return null;
+
+  const { data, error } = await supabase
+    .from("payments")
+    .select(`
+      id,
+      amount,
+      payment_method,
+      status,
+      reference_number,
+      created_at,
+      branches(name),
+      profiles!payments_user_id_fkey(first_name, last_name, email, phone),
+      memberships(status, start_date, end_date, membership_plans(name, price, duration))
+    `)
+    .eq("id", paymentId)
+    .single();
+
+  if (error) {
+    console.error("[getPaymentDetails] Error:", error);
+    return null;
+  }
+
+  return data;
+}

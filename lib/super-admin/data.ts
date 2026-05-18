@@ -36,6 +36,8 @@ export type MemberRow = {
   plan: string;
   status: "Active" | "Pending" | "At Risk" | "Inactive";
   joined: string;
+  expiryDate: string;
+  lastCheckIn: string;
 };
 
 export type PlanRow = {
@@ -54,6 +56,8 @@ export type PaymentRow = {
   amount: string;
   method: string;
   dueDate: string;
+  date: string;
+  referenceNumber: string;
   status: "Confirmed" | "Pending" | "Overdue";
 };
 
@@ -82,8 +86,11 @@ export type AttendanceBranchPoint = {
 
 export type SuperAttendanceLogRow = {
   id: number;
+  userId: string;
   member: string;
   branch: string;
+  homeBranch: string;
+  membershipStatus: string;
   date: string;
   time: string;
   rawTime: string;
@@ -120,6 +127,8 @@ type OverviewData = {
   revenueTrend: TrendPoint[];
   checkInTrend: TrendPoint[];
   branchRevenue: DistributionPoint[];
+  branchCheckIns: DistributionPoint[];
+  topPerformingBranch: string;
   planDistribution: DistributionPoint[];
   recentActivity: ActivityRow[];
   members: MemberRow[];
@@ -140,6 +149,8 @@ const emptyOverview: OverviewData = {
   revenueTrend: [],
   checkInTrend: [],
   branchRevenue: [],
+  branchCheckIns: [],
+  topPerformingBranch: "None",
   planDistribution: [],
   recentActivity: [],
   members: [],
@@ -176,12 +187,6 @@ function formatPeriodLabel(period: DashboardPeriod) {
   if (period === "7d") return "last 7 days";
   if (period === "quarter") return "this quarter";
   return "last 30 days";
-}
-
-function percentDelta(current: number, previous: number) {
-  if (previous === 0) return current > 0 ? "+100% vs prior period" : "No prior activity";
-  const delta = Math.round(((current - previous) / previous) * 100);
-  return `${delta >= 0 ? "+" : ""}${delta}% vs prior period`;
 }
 
 function formatCurrency(value: number) {
@@ -235,7 +240,7 @@ function formatShortDate(date: Date) {
 export async function getSuperAdminAttendance(): Promise<SuperAdminAttendanceData> {
   const empty: SuperAdminAttendanceData = {
     metrics: [
-      { label: "Today's Check-ins", value: "0", detail: "Across all branches" },
+      { label: "Total Check-ins Today", value: "0", detail: "Across all branches" },
       { label: "Busiest Branch", value: "None", detail: "No visits today" },
       { label: "Peak Hour", value: "None", detail: "No visits today" },
       { label: "This Week", value: "0", detail: "Mon-Sun visits" },
@@ -261,7 +266,7 @@ export async function getSuperAdminAttendance(): Promise<SuperAdminAttendanceDat
     const sevenDaysAgo = startOfLocalDay(now);
     sevenDaysAgo.setDate(now.getDate() - 6);
 
-    const [attendanceResult, branchesResult] = await Promise.all([
+    const [attendanceResult, branchesResult, profilesResult, membershipsResult] = await Promise.all([
       supabase
         .from("attendance")
         .select(`
@@ -276,16 +281,33 @@ export async function getSuperAdminAttendance(): Promise<SuperAdminAttendanceDat
         .lte("check_in_time", todayEnd.toISOString())
         .order("check_in_time", { ascending: false }),
       supabase.from("branches").select("id, name").order("name"),
+      supabase
+        .from("profiles")
+        .select("id, branch_id, branches(name)")
+        .eq("role", "MEMBER"),
+      supabase
+        .from("memberships")
+        .select("id, user_id, status, created_at")
+        .order("created_at", { ascending: false }),
     ]);
 
-    if (attendanceResult.error || branchesResult.error) {
+    if (attendanceResult.error || branchesResult.error || profilesResult.error || membershipsResult.error) {
       if (attendanceResult.error) console.error("[getSuperAdminAttendance] attendance query failed:", attendanceResult.error);
       if (branchesResult.error) console.error("[getSuperAdminAttendance] branches query failed:", branchesResult.error);
+      if (profilesResult.error) console.error("[getSuperAdminAttendance] profiles query failed:", profilesResult.error);
+      if (membershipsResult.error) console.error("[getSuperAdminAttendance] memberships query failed:", membershipsResult.error);
       return empty;
     }
 
     const attendance = attendanceResult.data ?? [];
     const allBranches = branchesResult.data ?? [];
+    const profileById = new Map((profilesResult.data ?? []).map((profile) => [profile.id, profile]));
+    const latestMembershipByUser = new Map<string, { user_id: string; status?: string | null }>();
+    for (const membership of membershipsResult.data ?? []) {
+      if (!latestMembershipByUser.has(membership.user_id)) {
+        latestMembershipByUser.set(membership.user_id, membership);
+      }
+    }
     const todayRows = attendance.filter((row) => {
       const date = new Date(row.check_in_time);
       return date >= todayStart && date <= todayEnd;
@@ -344,12 +366,20 @@ export async function getSuperAdminAttendance(): Promise<SuperAdminAttendanceDat
     const rows = attendance.slice(0, 50).map((row) => {
       const profile = row.profiles as unknown as { first_name?: string | null; last_name?: string | null } | null;
       const branch = Array.isArray(row.branches) ? row.branches[0] : row.branches;
+      const registrationProfile = profileById.get(row.user_id);
+      const homeBranch = Array.isArray(registrationProfile?.branches)
+        ? registrationProfile?.branches[0]
+        : registrationProfile?.branches;
+      const latestMembership = latestMembershipByUser.get(row.user_id);
       const date = new Date(row.check_in_time);
 
       return {
         id: row.id,
+        userId: row.user_id,
         member: profile ? `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() || "Member" : "Member",
         branch: branch?.name ?? "Unknown",
+        homeBranch: homeBranch?.name ?? "Unassigned",
+        membershipStatus: latestMembership?.status ?? "NONE",
         date: date.toLocaleDateString("en-US", {
           month: "short",
           day: "numeric",
@@ -368,7 +398,7 @@ export async function getSuperAdminAttendance(): Promise<SuperAdminAttendanceDat
     return {
       metrics: [
         {
-          label: "Today's Check-ins",
+          label: "Total Check-ins Today",
           value: todayRows.length.toLocaleString(),
           detail: "Across all branches",
         },
@@ -425,7 +455,7 @@ export async function getSuperAdminOverview(period: DashboardPeriod = "30d"): Pr
         .select("id, name, price, duration, is_active"),
       supabase
         .from("payments")
-        .select("id, user_id, branch_id, amount, payment_method, status, created_at, branches(name)")
+        .select("id, user_id, branch_id, amount, payment_method, status, reference_number, created_at, branches(name)")
         .order("created_at", { ascending: false }),
       supabase
         .from("attendance")
@@ -468,6 +498,13 @@ export async function getSuperAdminOverview(period: DashboardPeriod = "30d"): Pr
 
     const members = profiles.filter((profile) => profile.role === "MEMBER");
     const activeMemberIds = new Set(memberships.filter((membership) => membership.status === "ACTIVE").map((membership) => membership.user_id));
+    const totalRevenue = payments
+      .filter((payment) => payment.status === "CONFIRMED")
+      .reduce((total, payment) => total + Number(payment.amount ?? 0), 0);
+    const pendingPayments = payments.filter((payment) => payment.status === "PENDING");
+    const monthStart = startOfLocalDay(new Date());
+    monthStart.setDate(1);
+    const newMembersThisMonth = members.filter((member) => new Date(member.created_at) >= monthStart);
     const previousPeriodPayments = payments.filter(
       (payment) =>
         payment.status === "CONFIRMED" &&
@@ -478,29 +515,18 @@ export async function getSuperAdminOverview(period: DashboardPeriod = "30d"): Pr
       .filter((payment) => payment.status === "CONFIRMED" && new Date(payment.created_at) >= periodWindow.start)
       .reduce((total, payment) => total + Number(payment.amount ?? 0), 0);
     const previousRevenue = previousPeriodPayments.reduce((total, payment) => total + Number(payment.amount ?? 0), 0);
-    const periodAttendance = attendance.filter((item) => {
-      const date = new Date(item.check_in_time);
-      return date >= periodWindow.start && date <= periodWindow.end;
-    });
-    const previousPeriodAttendance = attendance.filter((item) => {
-      const date = new Date(item.check_in_time);
-      return date >= periodWindow.previousStart && date <= periodWindow.previousEnd;
-    });
-    const newMembers = members.filter((member) => {
-      const date = new Date(member.created_at);
-      return date >= periodWindow.start && date <= periodWindow.end;
-    });
-    const previousNewMembers = members.filter((member) => {
-      const date = new Date(member.created_at);
-      return date >= periodWindow.previousStart && date <= periodWindow.previousEnd;
-    });
-
     const branchNameById = new Map<number, string>(branches.map((branch) => [branch.id, branch.name]));
     const latestMembershipByUser = new Map<string, (typeof memberships)[number]>();
+    const latestAttendanceByUser = new Map<string, Date>();
 
     for (const membership of memberships) {
       if (!latestMembershipByUser.has(membership.user_id)) {
         latestMembershipByUser.set(membership.user_id, membership);
+      }
+    }
+    for (const item of attendance) {
+      if (!latestAttendanceByUser.has(item.user_id)) {
+        latestAttendanceByUser.set(item.user_id, new Date(item.check_in_time));
       }
     }
 
@@ -519,6 +545,16 @@ export async function getSuperAdminOverview(period: DashboardPeriod = "30d"): Pr
         branch: relatedBranch?.name ?? branchNameById.get(member.branch_id ?? -1) ?? "Unassigned",
         plan: (latestMembership?.membership_plans as { name?: string } | null)?.name ?? "No plan",
         status: statusFromMembership(latestMembership?.status),
+        expiryDate: latestMembership?.end_date
+          ? new Date(latestMembership.end_date).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })
+          : "Not set",
+        lastCheckIn: latestAttendanceByUser.get(member.id)
+          ? formatShortDate(latestAttendanceByUser.get(member.id) as Date)
+          : "Never",
         joined: new Date(member.created_at).toLocaleDateString("en-US", {
           month: "short",
           day: "numeric",
@@ -574,6 +610,12 @@ export async function getSuperAdminOverview(period: DashboardPeriod = "30d"): Pr
           day: "numeric",
           year: "numeric",
         }),
+        date: new Date(payment.created_at).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        }),
+        referenceNumber: payment.reference_number ?? "-",
         status:
           payment.status === "CONFIRMED"
             ? "Confirmed"
@@ -628,6 +670,24 @@ export async function getSuperAdminOverview(period: DashboardPeriod = "30d"): Pr
       .filter(([, value]) => value > 0)
       .map(([label, value]) => ({ label, value }))
       .sort((a, b) => b.value - a.value);
+    const branchCheckInMap = new Map<string, number>();
+    const dashboardTodayStart = startOfLocalDay(new Date());
+    const dashboardTodayEnd = endOfLocalDay(new Date());
+    for (const branch of branches) {
+      branchCheckInMap.set(branch.name, 0);
+    }
+    for (const item of attendance) {
+      const checkInDate = new Date(item.check_in_time);
+      if (checkInDate < dashboardTodayStart || checkInDate > dashboardTodayEnd) continue;
+      const branch = Array.isArray(item.branches) ? item.branches[0] : item.branches;
+      const branchName = branch?.name ?? branchNameById.get(item.branch_id ?? -1) ?? "Unassigned";
+      branchCheckInMap.set(branchName, (branchCheckInMap.get(branchName) ?? 0) + 1);
+    }
+    const branchCheckIns = [...branchCheckInMap.entries()]
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value);
+    const topPerformingBranch =
+      branchRevenue[0]?.label ?? branchCheckIns.find((branch) => branch.value > 0)?.label ?? "None";
 
     const activityItems = [
       ...payments.slice(0, 10).map((payment) => {
@@ -665,12 +725,6 @@ export async function getSuperAdminOverview(period: DashboardPeriod = "30d"): Pr
       .slice(0, 5)
       .map((item) => item.row);
 
-    const latestAttendanceByUser = new Map<string, Date>();
-    for (const item of attendance) {
-      if (!latestAttendanceByUser.has(item.user_id)) {
-        latestAttendanceByUser.set(item.user_id, new Date(item.check_in_time));
-      }
-    }
     const today = startOfLocalDay(new Date());
     const soon = startOfLocalDay(new Date());
     soon.setDate(soon.getDate() + 14);
@@ -722,33 +776,41 @@ export async function getSuperAdminOverview(period: DashboardPeriod = "30d"): Pr
       ...emptyOverview,
       metrics: [
         {
-          label: "Active members",
+          label: "Total Active Members",
           value: activeMemberIds.size.toLocaleString(),
           delta: `${members.length ? Math.round((activeMemberIds.size / members.length) * 100) : 0}% active`,
           trend: activeMemberIds.size ? "up" : "neutral",
         },
         {
-          label: "Revenue",
-          value: formatCurrency(monthlyRevenue || 0),
-          delta: `${formatPeriodLabel(period)} · ${percentDelta(monthlyRevenue, previousRevenue)}`,
+          label: "Total Revenue",
+          value: formatCurrency(totalRevenue || 0),
+          delta: `${formatCurrency(monthlyRevenue || 0)} ${formatPeriodLabel(period)}`,
           trend: monthlyRevenue > previousRevenue ? "up" : monthlyRevenue < previousRevenue ? "down" : "neutral",
         },
         {
-          label: "Check-ins",
-          value: periodAttendance.length.toLocaleString(),
-          delta: `${formatPeriodLabel(period)} · ${percentDelta(periodAttendance.length, previousPeriodAttendance.length)}`,
-          trend: periodAttendance.length > previousPeriodAttendance.length ? "up" : periodAttendance.length < previousPeriodAttendance.length ? "down" : "neutral",
+          label: "Total Check-ins Today",
+          value: (todayAttendanceCountResult.count ?? 0).toLocaleString(),
+          delta: "Across all branches",
+          trend: (todayAttendanceCountResult.count ?? 0) > 0 ? "up" : "neutral",
         },
         {
-          label: "New members",
-          value: newMembers.length.toLocaleString(),
-          delta: `${formatPeriodLabel(period)} · ${percentDelta(newMembers.length, previousNewMembers.length)}`,
-          trend: newMembers.length > previousNewMembers.length ? "up" : newMembers.length < previousNewMembers.length ? "down" : "neutral",
+          label: "Pending Payments",
+          value: pendingPayments.length.toLocaleString(),
+          delta: `${formatCurrency(pendingPayments.reduce((total, payment) => total + Number(payment.amount ?? 0), 0))} pending`,
+          trend: pendingPayments.length > 0 ? "down" : "up",
+        },
+        {
+          label: "New Members This Month",
+          value: newMembersThisMonth.length.toLocaleString(),
+          delta: "Registered this month",
+          trend: newMembersThisMonth.length > 0 ? "up" : "neutral",
         },
       ],
       revenueTrend,
       checkInTrend,
       branchRevenue,
+      branchCheckIns,
+      topPerformingBranch,
       planDistribution: livePlanDistribution,
       recentActivity: liveRecentActivity,
       members: liveMembers,

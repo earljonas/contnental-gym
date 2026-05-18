@@ -2,30 +2,11 @@ import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
+/* ─── Ollama Config ─── */
 const OLLAMA_URL = process.env.OLLAMA_URL ?? "http://localhost:11434";
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "llama3.1";
-const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX_REQUESTS = 10;
 
-const coachRateLimit = new Map<string, { count: number; resetAt: number }>();
-
-function checkRateLimit(userId: string) {
-  const now = Date.now();
-  const current = coachRateLimit.get(userId);
-
-  if (!current || current.resetAt <= now) {
-    coachRateLimit.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return { allowed: true, retryAfter: 0 };
-  }
-
-  if (current.count >= RATE_LIMIT_MAX_REQUESTS) {
-    return { allowed: false, retryAfter: Math.ceil((current.resetAt - now) / 1000) };
-  }
-
-  current.count += 1;
-  return { allowed: true, retryAfter: 0 };
-}
-
+/* ─── System Prompt Builder ─── */
 function buildSystemPrompt(context: {
   firstName: string;
   membershipStatus: string | null;
@@ -45,19 +26,19 @@ function buildSystemPrompt(context: {
   const sessionsBlock =
     context.recentSessions.length > 0
       ? context.recentSessions
-          .map((s) => {
-            const exList = s.exercises
-              .map(
-                (e) =>
-                  `  - ${e.name}: ${e.sets.map((set) => `${set.weight}kg×${set.reps}`).join(", ")}`
-              )
-              .join("\n");
-            return `• ${s.date} — ${s.routineName ?? "Quick Session"} (${s.durationMin}min, ${s.totalVolume}kg volume)\n${exList}`;
-          })
-          .join("\n")
+        .map((s) => {
+          const exList = s.exercises
+            .map(
+              (e) =>
+                `  - ${e.name}: ${e.sets.map((set) => `${set.weight}kg×${set.reps}`).join(", ")}`
+            )
+            .join("\n");
+          return `• ${s.date} — ${s.routineName ?? "Quick Session"} (${s.durationMin}min, ${s.totalVolume}kg volume)\n${exList}`;
+        })
+        .join("\n")
       : "No sessions logged yet.";
 
-  return `You are the AI Coach for Continental Fitness Gym. You are a knowledgeable, encouraging, and concise fitness coach.
+  return `You are the AI Coach for Contnental Fitness Gym. You are a knowledgeable, encouraging, and concise fitness coach.
 
 MEMBER PROFILE:
 - Name: ${context.firstName}
@@ -80,7 +61,9 @@ GUIDELINES:
 - Do NOT use markdown headers (#) or bullet lists unless specifically helpful.`;
 }
 
+/* ─── POST Handler ─── */
 export async function POST(request: Request) {
+  // Auth check
   const supabase = await createClient();
   const {
     data: { user },
@@ -88,17 +71,6 @@ export async function POST(request: Request) {
 
   if (!user) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const rateLimit = checkRateLimit(user.id);
-  if (!rateLimit.allowed) {
-    return Response.json(
-      { error: "Too many coach messages. Please wait a moment." },
-      {
-        status: 429,
-        headers: { "Retry-After": String(rateLimit.retryAfter) },
-      }
-    );
   }
 
   const body = await request.json();
@@ -113,9 +85,10 @@ export async function POST(request: Request) {
 
   const systemPrompt = buildSystemPrompt(context);
 
+  // Build Ollama request
   const ollamaMessages = [
     { role: "system", content: systemPrompt },
-    ...messages.slice(-20), // limit context to last 20 msgs
+    ...messages.slice(-20), // Keep last 20 messages for context window
   ];
 
   try {
@@ -143,6 +116,7 @@ export async function POST(request: Request) {
       );
     }
 
+    // Stream the response through to the client
     const reader = ollamaRes.body?.getReader();
     if (!reader) {
       return Response.json({ error: "No response stream" }, { status: 502 });
@@ -160,7 +134,7 @@ export async function POST(request: Request) {
             return;
           }
 
-          // ollama streams newline-delimited json
+          // Ollama streams newline-delimited JSON
           const text = decoder.decode(value, { stream: true });
           const lines = text.split("\n").filter((l) => l.trim());
 
@@ -168,6 +142,7 @@ export async function POST(request: Request) {
             try {
               const parsed = JSON.parse(line);
               if (parsed.message?.content) {
+                // Send just the content token
                 controller.enqueue(
                   encoder.encode(
                     `data: ${JSON.stringify({ token: parsed.message.content })}\n\n`
@@ -180,7 +155,7 @@ export async function POST(request: Request) {
                 );
               }
             } catch {
-              // skip bad lines
+              // Skip malformed lines
             }
           }
         } catch (err) {

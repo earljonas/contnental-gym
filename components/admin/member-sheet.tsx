@@ -27,6 +27,7 @@ type MemberDetails = {
     avatar_url?: string | null;
     role: string;
     created_at?: string | null;
+    branches?: { name?: string | null } | { name?: string | null }[] | null;
   } | null;
   memberships: {
     id: number;
@@ -34,14 +35,31 @@ type MemberDetails = {
     start_date?: string | null;
     created_at: string;
     end_date: string | null;
-    membership_plans?: { name?: string | null } | { name?: string | null }[] | null;
+    membership_plans?: {
+      name?: string | null;
+      price?: number | string | null;
+      duration?: number | null;
+      features?: string[] | null;
+    } | {
+      name?: string | null;
+      price?: number | string | null;
+      duration?: number | null;
+      features?: string[] | null;
+    }[] | null;
   }[];
   payments: {
     id: number;
     amount: number | string;
     status: string;
     payment_method: string;
+    reference_number?: string | null;
     created_at: string;
+    branches?: { name?: string | null } | { name?: string | null }[] | null;
+    memberships?: {
+      membership_plans?: { name?: string | null } | { name?: string | null }[] | null;
+    } | {
+      membership_plans?: { name?: string | null } | { name?: string | null }[] | null;
+    }[] | null;
   }[];
   attendance: {
     id: number;
@@ -77,6 +95,16 @@ function planName(
   plan: MemberDetails["memberships"][number]["membership_plans"]
 ) {
   return (Array.isArray(plan) ? plan[0] : plan)?.name ?? "Unknown Plan";
+}
+
+function planDetails(
+  plan: MemberDetails["memberships"][number]["membership_plans"]
+) {
+  return Array.isArray(plan) ? plan[0] : plan;
+}
+
+function branchName(branches: { name?: string | null } | { name?: string | null }[] | null | undefined) {
+  return (Array.isArray(branches) ? branches[0] : branches)?.name ?? "Unassigned";
 }
 
 function escapeHtml(value: unknown) {
@@ -165,6 +193,9 @@ export function MemberSheet({ details }: { details: MemberDetails }) {
   const currentStatus = currentMembership?.status ?? "NONE";
   const currentPlan = currentMembership ? planName(currentMembership.membership_plans) : "No plan";
   const initials = `${profile.first_name[0] ?? ""}${profile.last_name[0] ?? ""}`.toUpperCase();
+  const lastAttendance = details.attendance[0] ?? null;
+  const lastCheckInBranch = lastAttendance ? branchName(lastAttendance.branches) : "No check-ins";
+  const profileBranch = branchName(profile.branches);
 
   return (
     <div
@@ -251,6 +282,20 @@ export function MemberSheet({ details }: { details: MemberDetails }) {
                 </p>
                 <p className="mt-1 truncate text-sm font-bold text-foreground">{currentPlan}</p>
               </div>
+              <div className="rounded-2xl border border-border bg-card p-4">
+                <Shield className="mb-3 size-4 text-muted-foreground" />
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                  Registration Branch
+                </p>
+                <p className="mt-1 truncate text-sm font-bold text-foreground">{profileBranch}</p>
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-4">
+                <Activity className="mb-3 size-4 text-muted-foreground" />
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                  Last Check-in Branch
+                </p>
+                <p className="mt-1 truncate text-sm font-bold text-foreground">{lastCheckInBranch}</p>
+              </div>
             </div>
 
             <div className="rounded-2xl border border-border bg-card p-5">
@@ -278,7 +323,10 @@ export function MemberSheet({ details }: { details: MemberDetails }) {
                 Membership History
               </h4>
               <div className="divide-y divide-border">
-                {details.memberships.map((membership) => (
+                {details.memberships.map((membership) => {
+                  const plan = planDetails(membership.membership_plans);
+
+                  return (
                   <div key={membership.id} className="flex items-center justify-between gap-4 p-5">
                     <div className="min-w-0">
                       <span className="text-sm font-bold text-foreground">
@@ -288,12 +336,19 @@ export function MemberSheet({ details }: { details: MemberDetails }) {
                         {formatDate(membership.start_date ?? membership.created_at)} to{" "}
                         {membership.end_date ? formatDate(membership.end_date) : "Ongoing"}
                       </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {plan?.price ? `PHP ${Number(plan.price).toLocaleString()}` : "No price"} - {plan?.duration ?? "?"} days
+                      </p>
+                      {plan?.features?.length ? (
+                        <p className="mt-1 text-xs text-muted-foreground">{plan.features.join(", ")}</p>
+                      ) : null}
                     </div>
                     <Badge variant="outline" className={statusBadgeClass(membership.status)}>
                       {membership.status}
                     </Badge>
                   </div>
-                ))}
+                  );
+                })}
                 {details.memberships.length === 0 ? (
                   <p className="p-5 text-sm text-muted-foreground">No records found.</p>
                 ) : null}
@@ -305,7 +360,15 @@ export function MemberSheet({ details }: { details: MemberDetails }) {
                 Recent Payments
               </h4>
               <div className="divide-y divide-border">
-                {details.payments.map((payment) => (
+                {details.payments.map((payment) => {
+                  const paymentBranch = branchName(payment.branches);
+                  const paymentMembership = Array.isArray(payment.memberships) ? payment.memberships[0] : payment.memberships;
+                  const linkedPlan = Array.isArray(paymentMembership?.membership_plans)
+                    ? paymentMembership?.membership_plans[0]
+                    : paymentMembership?.membership_plans;
+                  const paymentPlan = linkedPlan?.name ?? "No linked plan";
+
+                  return (
                   <div key={payment.id} className="flex items-center justify-between gap-4 p-5">
                     <div className="min-w-0">
                       <span className="flex items-center gap-2 text-sm font-bold text-foreground">
@@ -313,7 +376,10 @@ export function MemberSheet({ details }: { details: MemberDetails }) {
                         PHP {Number(payment.amount).toLocaleString()}
                       </span>
                       <p className="text-xs text-muted-foreground">
-                        via {payment.payment_method} on {formatDate(payment.created_at)}
+                        via {payment.payment_method} at {paymentBranch} on {formatDate(payment.created_at)}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {paymentPlan} - Ref {payment.reference_number || "-"}
                       </p>
                     </div>
                     <Badge variant="secondary" className={payment.status === "CONFIRMED" ? "badge-active" : "badge-pending"}>
@@ -335,7 +401,8 @@ export function MemberSheet({ details }: { details: MemberDetails }) {
                       <Printer className="size-4" />
                     </Button>
                   </div>
-                ))}
+                  );
+                })}
                 {details.payments.length === 0 ? (
                   <p className="p-5 text-sm text-muted-foreground">No records found.</p>
                 ) : null}

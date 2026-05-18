@@ -141,6 +141,147 @@ export async function updateBranchMemberProfile(data: {
   }
 }
 
+export async function completeExistingMemberRegistration(data: {
+  memberId: string;
+  planId: number;
+  paymentMethod: "CASH" | "GCASH";
+  referenceNumber?: string;
+}) {
+  try {
+    if (!canUseAdminClient()) {
+      return {
+        error:
+          "Completing an existing account requires SUPABASE_SERVICE_ROLE_KEY so the app can create the membership safely.",
+      };
+    }
+
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { error: "Not authenticated" };
+
+    const roleInfo = await getUserRole(supabase, user.id);
+    if (roleInfo.role !== "BRANCH_ADMIN" || !roleInfo.branch_id) {
+      return { error: "Unauthorized" };
+    }
+
+    const referenceNumber = data.referenceNumber?.trim() || null;
+    if (data.paymentMethod === "GCASH" && !referenceNumber) {
+      return { error: "GCash reference number is required" };
+    }
+
+    const { data: targetMember, error: targetError } = await supabase
+      .from("profiles")
+      .select("id, role, branch_id")
+      .eq("id", data.memberId)
+      .eq("role", "MEMBER")
+      .maybeSingle();
+
+    if (targetError) {
+      console.error("[completeExistingMemberRegistration] target lookup failed:", targetError);
+      return { error: "Failed to load member" };
+    }
+    if (!targetMember) return { error: "Member not found" };
+
+    const { data: existingMemberships, error: membershipsError } = await supabase
+      .from("memberships")
+      .select("id, status")
+      .eq("user_id", data.memberId);
+
+    if (membershipsError) {
+      console.error("[completeExistingMemberRegistration] membership lookup failed:", membershipsError);
+      return { error: "Failed to verify member membership" };
+    }
+    if ((existingMemberships ?? []).some((membership) => membership.status === "ACTIVE")) {
+      return { error: "Member already has an active membership" };
+    }
+    if ((existingMemberships ?? []).length > 0) {
+      return { error: "Member already has membership history. Use the existing renewal or activation flow." };
+    }
+
+    const { data: plan, error: planError } = await supabase
+      .from("membership_plans")
+      .select("id, name, price, duration, is_active")
+      .eq("id", data.planId)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (planError) {
+      console.error("[completeExistingMemberRegistration] plan lookup failed:", planError);
+      return { error: "Failed to load selected plan" };
+    }
+    if (!plan) return { error: "Selected plan is not available" };
+
+    const admin = createAdminClient();
+    const today = new Date();
+    const endDate = new Date(today);
+    endDate.setDate(endDate.getDate() + Number(plan.duration));
+
+    if (!targetMember.branch_id) {
+      const { error: profileError } = await admin
+        .from("profiles")
+        .update({
+          branch_id: roleInfo.branch_id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", data.memberId)
+        .eq("role", "MEMBER")
+        .is("branch_id", null);
+
+      if (profileError) {
+        console.error("[completeExistingMemberRegistration] profile update failed:", profileError);
+        return { error: "Failed to set registration branch" };
+      }
+    }
+
+    const { data: membership, error: membershipError } = await admin
+      .from("memberships")
+      .insert({
+        user_id: data.memberId,
+        plan_id: plan.id,
+        status: "ACTIVE",
+        start_date: today.toISOString().split("T")[0],
+        end_date: endDate.toISOString().split("T")[0],
+      })
+      .select("id")
+      .single();
+
+    if (membershipError || !membership) {
+      console.error("[completeExistingMemberRegistration] membership insert failed:", membershipError);
+      return { error: "Failed to create membership" };
+    }
+
+    const { error: paymentError } = await admin.from("payments").insert({
+      user_id: data.memberId,
+      membership_id: membership.id,
+      branch_id: roleInfo.branch_id,
+      amount: Number(plan.price),
+      payment_method: data.paymentMethod,
+      status: "CONFIRMED",
+      reference_number: referenceNumber,
+      confirmed_by: user.id,
+      confirmed_at: new Date().toISOString(),
+    });
+
+    if (paymentError) {
+      console.error("[completeExistingMemberRegistration] payment insert failed:", paymentError);
+      await admin.from("memberships").delete().eq("id", membership.id);
+      return { error: "Failed to record payment" };
+    }
+
+    revalidatePath("/branch");
+    revalidatePath("/branch/members");
+    revalidatePath("/branch/billing");
+
+    return { success: true, memberId: data.memberId };
+  } catch (err) {
+    console.error("[completeExistingMemberRegistration] Unexpected error:", err);
+    return { error: err instanceof Error ? err.message : "Unexpected error occurred" };
+  }
+}
+
 export async function registerWalkInMember(data: {
   firstName: string;
   lastName: string;

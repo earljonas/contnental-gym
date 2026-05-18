@@ -3,10 +3,16 @@ import { ExportButton } from "@/components/admin/export-button";
 import { getBillingMemberOptions } from "@/lib/branch-admin/data";
 import { getSuperAdminOverview } from "@/lib/super-admin/data";
 import { createClient } from "@/lib/supabase/server";
-import { confirmPayment } from "./actions";
+import { PaymentSheet } from "@/components/admin/payment-sheet";
+import { confirmPayment, getPaymentDetails } from "./actions";
 import { RecordPaymentButton } from "./record-payment";
 
-export default async function BillingPage() {
+export default async function BillingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ paymentId?: string }>;
+}) {
+  const query = await searchParams;
   const overview = await getSuperAdminOverview();
   const supabase = await createClient();
 
@@ -17,8 +23,10 @@ export default async function BillingPage() {
       .select("id, name")
       .order("name"),
   ]);
+  const paymentDetails = query.paymentId ? await getPaymentDetails(Number(query.paymentId)) : null;
 
   return (
+    <>
     <ResourcePage
       title="Billing"
       summary={[
@@ -33,11 +41,12 @@ export default async function BillingPage() {
             rows={overview.payments}
             columns={[
               { header: "Member", key: "member" },
-              { header: "Collected At", key: "branch" },
               { header: "Amount", key: "amount" },
-              { header: "Method", key: "method" },
-              { header: "Payment Date", key: "dueDate" },
-              { header: "Status", key: "status" },
+              { header: "Payment Method", key: "method" },
+              { header: "Payment Status", key: "status" },
+              { header: "Reference Number", key: "referenceNumber" },
+              { header: "Payment Branch", key: "branch" },
+              { header: "Date", key: "date" },
             ]}
             filename="contnental-payments"
           />
@@ -47,27 +56,31 @@ export default async function BillingPage() {
       tableTitle="Transactions"
       columns={[
         { header: "Member", key: "member" },
-        { header: "Collected At", key: "branch" },
         { header: "Amount", key: "amount" },
-        { header: "Method", key: "method" },
-        { header: "Payment Date", key: "dueDate" },
-        { header: "Status", key: "status", cellType: "status" },
-        { header: "Action", cellType: "payment-action" },
+        { header: "Payment Method", key: "method" },
+        { header: "Payment Status", key: "status", cellType: "status" },
+        { header: "Reference Number", key: "referenceNumber" },
+        { header: "Payment Branch", key: "branch" },
+        { header: "Date", key: "date" },
+        { header: "Actions", cellType: "payment-action" },
       ]}
       rows={overview.payments}
       onPaymentConfirm={async (id: number) => {
         "use server";
         await confirmPayment(id);
       }}
-      searchPlaceholder="Search member or amount"
-      searchKeys={["member", "branch", "amount", "method"]}
+      searchPlaceholder="Search member, reference, branch..."
+      searchKeys={["member", "branch", "amount", "method", "referenceNumber"]}
       filters={[
-        { key: "status", label: "Status", options: ["Confirmed", "Pending", "Overdue"] },
         { key: "branch", label: "Branch", options: [...new Set(overview.payments.map((item) => item.branch).filter(Boolean))] },
+        { key: "status", label: "Status", options: ["Confirmed", "Pending", "Overdue"] },
         { key: "method", label: "Method", options: [...new Set(overview.payments.map((item) => item.method).filter(Boolean))] },
       ]}
-      dateKey="dueDate"
+      dateKey="date"
+      paymentViewPath="/admin/billing"
       enableTableExport={false}
     />
+    {paymentDetails ? <PaymentSheet details={paymentDetails} /> : null}
+    </>
   );
 }

@@ -206,6 +206,7 @@ export function ResourceTable<T extends Record<string, unknown>>({
   dateKey,
   onPaymentConfirm,
   memberViewPath = "/admin/members",
+  paymentViewPath = "/admin/billing",
   enableExport = true,
 }: {
   columns: Column<T>[];
@@ -216,8 +217,10 @@ export function ResourceTable<T extends Record<string, unknown>>({
   dateKey?: keyof T;
   onPaymentConfirm?: (id: number) => Promise<unknown>;
   memberViewPath?: string;
+  paymentViewPath?: string;
   enableExport?: boolean;
 }) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [activeFilters, setActiveFilters] = useState<Record<string, string>>({});
   const [sortKey, setSortKey] = useState<keyof T | "">("");
@@ -473,6 +476,16 @@ export function ResourceTable<T extends Record<string, unknown>>({
                         </Button>
                       ) : isPaymentAction ? (
                         <div className="flex justify-center gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon-sm"
+                            className="rounded-xl"
+                            onClick={() => router.push(`${paymentViewPath}?paymentId=${row["id"]}`)}
+                            aria-label="View payment details"
+                          >
+                            <Eye className="size-4" />
+                          </Button>
                           {row["status"] === "Pending" ? (
                             <Button
                               onClick={() => onPaymentConfirm?.(row["id"] as number)}

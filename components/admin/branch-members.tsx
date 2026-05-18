@@ -25,6 +25,7 @@ import {
 
 import { ActivateModal } from "@/app/(branch)/branch/activate-modal";
 import {
+  completeExistingMemberRegistration,
   manualCheckInFromMembers,
   registerWalkInMember,
   updateBranchMemberProfile,
@@ -135,12 +136,14 @@ function MemberActionsMenu({
   feedback,
   onEdit,
   onCheckIn,
+  onCompleteRegistration,
 }: {
   member: MemberRow;
   isPending: boolean;
   feedback: Feedback;
   onEdit: () => void;
   onCheckIn: () => void;
+  onCompleteRegistration: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
@@ -149,8 +152,8 @@ function MemberActionsMenu({
 
   function getMenuPosition(rect: DOMRect) {
     const viewportPadding = 12;
-    const menuWidth = 176;
-    const menuHeight = 92;
+    const menuWidth = member.status === "NONE" && member.plan === "No plan" ? 224 : 176;
+    const menuHeight = member.status === "NONE" && member.plan === "No plan" ? 132 : 92;
     const gap = 8;
 
     const centeredLeft = rect.left + rect.width / 2 - menuWidth / 2;
@@ -229,7 +232,9 @@ function MemberActionsMenu({
       {open ? createPortal(
         <div
           ref={menuRef}
-          className="fixed z-[80] w-44 rounded-2xl border border-border bg-card p-1"
+          className={`fixed z-[80] rounded-2xl border border-border bg-card p-1 ${
+            member.status === "NONE" && member.plan === "No plan" ? "w-56" : "w-44"
+          }`}
           style={{ top: position.top, left: position.left }}
         >
           <Button
@@ -257,6 +262,21 @@ function MemberActionsMenu({
             <UserCheck className="size-4 text-muted-foreground" />
             {feedback?.id === member.id ? feedback.message : "Check in"}
           </Button>
+          {member.status === "NONE" && member.plan === "No plan" ? (
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-10 w-full justify-start rounded-xl px-3"
+              onClick={() => {
+                setOpen(false);
+                onCompleteRegistration();
+              }}
+              disabled={isPending}
+            >
+              <UserPlus className="size-4 text-muted-foreground" />
+              Complete Registration
+            </Button>
+          ) : null}
         </div>,
         document.body
       ) : null}
@@ -582,6 +602,216 @@ function BranchMemberSheet({
                 ) : null}
               </div>
             </section>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CompleteRegistrationModal({
+  member,
+  plans,
+  onClose,
+}: {
+  member: MemberRow;
+  plans: BranchPlanOption[];
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState("");
+  const [planId, setPlanId] = useState(plans[0]?.id.toString() ?? "");
+  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "GCASH">("CASH");
+  const [referenceNumber, setReferenceNumber] = useState("");
+
+  const selectedPlan = plans.find((plan) => plan.id.toString() === planId) ?? null;
+
+  function handleSubmit() {
+    if (!selectedPlan) {
+      setError("Select a membership plan");
+      return;
+    }
+
+    startTransition(async () => {
+      setError("");
+      const result = await completeExistingMemberRegistration({
+        memberId: member.id,
+        planId: selectedPlan.id,
+        paymentMethod,
+        referenceNumber: paymentMethod === "GCASH" ? referenceNumber : undefined,
+      });
+
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+
+      onClose();
+      router.push(`/branch/members?memberId=${member.id}`);
+      router.refresh();
+    });
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="complete-registration-title"
+      onClick={onClose}
+    >
+      <div
+        className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-border bg-card"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-border bg-secondary/30 p-6">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+              Complete Registration
+            </p>
+            <h2
+              id="complete-registration-title"
+              className="mt-1 font-display text-3xl font-black uppercase leading-none tracking-tight text-foreground"
+            >
+              Activate Membership
+            </h2>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            className="rounded-xl"
+            onClick={onClose}
+            disabled={isPending}
+            aria-label="Close complete registration"
+          >
+            <X className="size-4" />
+          </Button>
+        </div>
+
+        <div className="space-y-6 overflow-y-auto p-6">
+          <section className="rounded-2xl border border-border bg-secondary/30 p-5">
+            <h3 className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+              Existing Account
+            </h3>
+            <div className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+              <div>
+                <p className="text-xs text-muted-foreground">Member</p>
+                <p className="font-semibold text-foreground">{member.name}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Email</p>
+                <p className="font-semibold text-foreground">{member.email}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Current Status</p>
+                <p className="font-semibold text-foreground">{member.status}</p>
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <h3 className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+              Membership and Payment
+            </h3>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="complete-plan" className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                  Plan
+                </Label>
+                <Select
+                  id="complete-plan"
+                  value={planId}
+                  onChange={(event) => setPlanId(event.target.value)}
+                  className="h-11 rounded-xl focus:border-[#C9973E] focus:ring-[#C9973E]/20"
+                  disabled={isPending || plans.length === 0}
+                >
+                  {plans.map((plan) => (
+                    <option key={plan.id} value={plan.id}>
+                      {plan.name} - PHP {plan.price.toLocaleString()}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="complete-method" className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                  Payment method
+                </Label>
+                <Select
+                  id="complete-method"
+                  value={paymentMethod}
+                  onChange={(event) => setPaymentMethod(event.target.value as "CASH" | "GCASH")}
+                  className="h-11 rounded-xl focus:border-[#C9973E] focus:ring-[#C9973E]/20"
+                  disabled={isPending}
+                >
+                  <option value="CASH">Cash</option>
+                  <option value="GCASH">GCash</option>
+                </Select>
+              </div>
+              {paymentMethod === "GCASH" ? (
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="complete-reference" className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                    Reference number
+                  </Label>
+                  <Input
+                    id="complete-reference"
+                    value={referenceNumber}
+                    onChange={(event) => setReferenceNumber(event.target.value)}
+                    className="h-11 rounded-xl focus:border-[#C9973E] focus:ring-[#C9973E]/20"
+                    disabled={isPending}
+                  />
+                </div>
+              ) : null}
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-border bg-secondary/30 p-5">
+            <h3 className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+              Summary
+            </h3>
+            <div className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+              <div>
+                <p className="text-xs text-muted-foreground">Plan</p>
+                <p className="font-semibold text-foreground">{selectedPlan?.name ?? "No plan"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Amount</p>
+                <p className="font-semibold text-foreground">
+                  {selectedPlan ? `PHP ${selectedPlan.price.toLocaleString()}` : "PHP 0"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Payment</p>
+                <p className="font-semibold text-foreground">{paymentMethod}</p>
+              </div>
+            </div>
+          </section>
+
+          {error ? (
+            <p className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-500">
+              {error}
+            </p>
+          ) : null}
+
+          <div className="flex justify-end gap-3 border-t border-border pt-5">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 rounded-xl px-5"
+              onClick={onClose}
+              disabled={isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="h-11 rounded-xl bg-[#C9973E] px-5 font-bold uppercase tracking-wider text-black"
+              onClick={handleSubmit}
+              disabled={isPending || plans.length === 0}
+            >
+              {isPending ? "Completing..." : "Complete Registration"}
+            </Button>
           </div>
         </div>
       </div>
@@ -945,6 +1175,7 @@ export function BranchMembersPage({
   const [memberPage, setMemberPage] = useState(1);
   const [checkInFeedback, setCheckInFeedback] = useState<Feedback>(null);
   const [activatingMember, setActivatingMember] = useState<PendingMember | null>(null);
+  const [completingMember, setCompletingMember] = useState<MemberRow | null>(null);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
 
   const filteredMembers = data.members.filter((member) => {
@@ -1085,6 +1316,7 @@ export function BranchMembersPage({
                     className="h-10 w-full rounded-xl border-border bg-background text-sm sm:w-[140px]"
                   >
                     <option value="All">All Status</option>
+                    <option value="NONE">Incomplete</option>
                     <option value="ACTIVE">Active</option>
                     <option value="PENDING">Pending</option>
                     <option value="EXPIRED">Expired</option>
@@ -1165,6 +1397,7 @@ export function BranchMembersPage({
                             feedback={checkInFeedback}
                             onEdit={() => openMember(member.id, "edit")}
                             onCheckIn={() => handleCheckIn(member.id)}
+                            onCompleteRegistration={() => setCompletingMember(member)}
                           />
                         </TableCell>
                       </TableRow>
@@ -1281,6 +1514,14 @@ export function BranchMembersPage({
 
       {activatingMember ? (
         <ActivateModal member={activatingMember} onClose={() => setActivatingMember(null)} />
+      ) : null}
+
+      {completingMember ? (
+        <CompleteRegistrationModal
+          member={completingMember}
+          plans={planOptions}
+          onClose={() => setCompletingMember(null)}
+        />
       ) : null}
 
       {showRegisterModal ? (

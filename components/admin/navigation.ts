@@ -2,6 +2,7 @@ import {
   Activity,
   BellRing,
   Building2,
+  ClipboardList,
   CreditCard,
   LayoutDashboard,
   Users,
@@ -23,6 +24,7 @@ const adminNav: AdminNavItem[] = [
   { href: "/admin/billing", label: "Billing", icon: CreditCard },
   { href: "/admin/attendance", label: "Attendance", icon: Activity },
   { href: "/super-admin/branches", label: "Branches", icon: Building2, roles: ["SUPER_ADMIN"] },
+  { href: "/admin/membership-plans", label: "Membership Plans", icon: ClipboardList, roles: ["SUPER_ADMIN"] },
   { href: "/admin/announcements", label: "Announcements", icon: BellRing },
 ] as const;
 

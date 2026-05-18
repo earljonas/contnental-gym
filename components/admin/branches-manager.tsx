@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, useEffect, useCallback } from "react";
-import { MapPin, X, Edit2, Building2, UserCircle } from "lucide-react";
+import { MapPin, X, Edit2, Building2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 
@@ -16,8 +16,8 @@ export type BranchCard = {
   id: number;
   name: string;
   location: string;
+  registeredMembers: number;
   activeMembers: number;
-  adminName?: string;
 };
 
 type EditState = {
@@ -131,12 +131,6 @@ export function BranchesManager({
                     <MapPin className="size-3.5" />
                     {branch.location}
                   </p>
-                  {branch.adminName ? (
-                    <p className="flex items-center gap-1.5 text-sm text-muted-foreground/80 font-medium">
-                      <UserCircle className="size-3.5" />
-                      {branch.adminName}
-                    </p>
-                  ) : null}
                 </div>
 
                 <button
@@ -148,17 +142,24 @@ export function BranchesManager({
                 </button>
               </div>
 
-              <div className="relative z-10 mt-10 flex items-end justify-between border-t border-border/50 pt-6">
+              <div className="relative z-10 mt-10 grid gap-5 border-t border-border/50 pt-6 sm:grid-cols-2">
                 <div className="space-y-1">
                   <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-                    Registered Here
+                    Registered Members
+                  </p>
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-display text-4xl font-black tracking-tighter text-foreground leading-none">
+                      {branch.registeredMembers}
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                    Active Registered
                   </p>
                   <div className="flex items-baseline gap-2">
                     <span className="font-display text-4xl font-black tracking-tighter text-foreground leading-none">
                       {branch.activeMembers}
-                    </span>
-                    <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/60">
-                      Active
                     </span>
                   </div>
                 </div>
