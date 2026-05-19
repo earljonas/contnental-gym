@@ -83,6 +83,23 @@ const feedbackConfig = {
 // ── QR Scanner Component ──
 
 type Html5QrcodeType = InstanceType<typeof import("html5-qrcode").Html5Qrcode>;
+type Html5QrcodeScannerStateType = typeof import("html5-qrcode").Html5QrcodeScannerState;
+
+function stopScannerSafely(
+  scanner: Html5QrcodeType | null,
+  scannerState: Html5QrcodeScannerStateType | null
+) {
+  if (!scanner || !scannerState) return;
+
+  try {
+    const state = scanner.getState();
+    if (state !== scannerState.SCANNING && state !== scannerState.PAUSED) return;
+
+    scanner.stop().catch(() => {});
+  } catch {
+    // html5-qrcode can throw synchronously if stop races with startup.
+  }
+}
 
 function QrScanner({ onScan, enabled }: { onScan: (code: string) => void; enabled: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -94,13 +111,15 @@ function QrScanner({ onScan, enabled }: { onScan: (code: string) => void; enable
     if (!enabled || !containerRef.current) return;
 
     let html5QrCode: Html5QrcodeType | null = null;
+    let html5QrCodeState: Html5QrcodeScannerStateType | null = null;
     let mounted = true;
 
     async function startScanner() {
       try {
-        const { Html5Qrcode } = await import("html5-qrcode");
+        const { Html5Qrcode, Html5QrcodeScannerState } = await import("html5-qrcode");
         if (!mounted || !containerRef.current) return;
 
+        html5QrCodeState = Html5QrcodeScannerState;
         html5QrCode = new Html5Qrcode(containerRef.current.id);
         scannerRef.current = html5QrCode;
 
@@ -119,7 +138,11 @@ function QrScanner({ onScan, enabled }: { onScan: (code: string) => void; enable
           }
         );
 
-        if (mounted) setCameraActive(true);
+        if (mounted) {
+          setCameraActive(true);
+        } else {
+          stopScannerSafely(html5QrCode, html5QrCodeState);
+        }
       } catch (err: unknown) {
         if (mounted) {
           const message =
@@ -144,9 +167,8 @@ function QrScanner({ onScan, enabled }: { onScan: (code: string) => void; enable
 
     return () => {
       mounted = false;
-      if (html5QrCode) {
-        html5QrCode.stop().catch(() => {});
-      }
+      stopScannerSafely(html5QrCode, html5QrCodeState);
+      scannerRef.current = null;
     };
   }, [enabled, onScan]);
 
