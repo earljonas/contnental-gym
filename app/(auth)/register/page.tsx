@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
+import { checkRegistrationEmail } from "./actions";
 
 /* ─── TYPES ─── */
 interface FormData {
@@ -61,6 +62,7 @@ const plans = [
 ];
 
 const steps = ["Account", "Plan", "Verify", "Done"];
+const duplicateEmailMessage = "An account with this email already exists. Please sign in instead.";
 
 const pageVariants = {
   enter: (dir: number) => ({ x: dir > 0 ? 40 : -40, opacity: 0 }),
@@ -121,11 +123,26 @@ export default function RegisterPage() {
     if (!form.plan) { setErrors({ plan: "Select a plan" }); return; }
     setErrors({});
     setLoading(true);
+    const email = form.email.trim().toLowerCase();
+
+    const emailCheck = await checkRegistrationEmail(email);
+    if (emailCheck.error) {
+      setErrors({ email: emailCheck.error });
+      setLoading(false);
+      setStep(0);
+      return;
+    }
+    if (emailCheck.exists) {
+      setErrors({ email: duplicateEmailMessage });
+      setLoading(false);
+      setStep(0);
+      return;
+    }
 
     // Sign up with Supabase — this creates the auth user
     // The trigger will auto-create the profile row
-    const { error: signUpError } = await supabase.auth.signUp({
-      email: form.email,
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      email,
       password: form.password,
       options: {
         data: {
@@ -143,6 +160,14 @@ export default function RegisterPage() {
       return;
     }
 
+    if (signUpData.user?.identities && signUpData.user.identities.length === 0) {
+      setErrors({ email: duplicateEmailMessage });
+      setLoading(false);
+      setStep(0);
+      return;
+    }
+
+    setForm((p) => ({ ...p, email }));
     setLoading(false);
     next();
   };
