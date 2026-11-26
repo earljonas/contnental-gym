@@ -4,7 +4,7 @@
 
 ## Prerequisites
 
-- Node.js 20.9 or newer and npm.
+- The Node.js LTS version pinned in [`.nvmrc`](../.nvmrc) and its bundled npm.
 - A dedicated development Supabase project with access to its SQL Editor, Auth settings, and Data API. Use test accounts and fictional member records.
 - A test inbox for signup email codes. To scan a QR code, use a camera-enabled browser on localhost or HTTPS and allow camera access. [Browser camera requirements](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia#privacy_and_security)
 
@@ -130,7 +130,7 @@ Run the second command in a separate terminal if `ollama serve` is running in th
 
 ## Verify the main workflows
 
-Run `npm run lint` for static lint checks. The repository has no automated test command. Use these manual checks with your development accounts.
+Run `npm run lint` and `npm run typecheck` for static checks. [CI](../.github/workflows/ci.yml) also builds the production bundle and smoke-tests public routes and the anonymous dashboard redirect with placeholder Supabase settings. Use the manual checks below with your development accounts.
 
 | Check | Expected result |
 | --- | --- |
@@ -149,6 +149,6 @@ npm run build
 npm run start
 ```
 
-`npm run start` requires a successful build. In the current checkout, the leftover [`/instruments` route](../app/instruments/page.tsx) imports a missing Supabase module and blocks the build. The build also needs access to Google Fonts for the two typefaces loaded through `next/font/google`.
+`npm run start` serves the output of the production build. Barlow Condensed and DM Sans are bundled with the app and served locally. See the [font licenses and sources](../app/fonts/README.md).
 
 Deployment requires a Next.js server runtime for session handling, Server Actions, and the streaming coach endpoint. Configure the Supabase URL, keys, and Auth Site URL for the target environment. Review account-role provisioning and database permissions before enabling public registration. A hosted coach requires an Ollama endpoint reachable from the deployment.
