@@ -26,8 +26,8 @@ The app uses Next.js 16 App Router, React 19, TypeScript, and Tailwind CSS. Supa
 
 ## Run locally
 
-Use Node.js 20.9 or newer, npm, and a development Supabase project. The [setup guide](docs/GETTING_STARTED.md) covers database initialization, signup email codes, staff accounts, and a manual walkthrough. The [architecture guide](docs/ARCHITECTURE.md) explains the data model, access rules, and HTTP endpoints.
+Use the Node.js LTS version in [`.nvmrc`](.nvmrc), npm, and a development Supabase project. The [setup guide](docs/GETTING_STARTED.md) covers database initialization, signup email codes, staff accounts, and a manual walkthrough. The [architecture guide](docs/ARCHITECTURE.md) explains the data model, access rules, and HTTP endpoints.
 
 ## Current status
 
-Staff record cash and GCash payments manually. AI coaching requires an Ollama endpoint reachable from the app server. The current checkout has a [known production build blocker](docs/GETTING_STARTED.md#build-and-start).
+Staff record cash and GCash payments manually. AI coaching requires an Ollama endpoint reachable from the app server.

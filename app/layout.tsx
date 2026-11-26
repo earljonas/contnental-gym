@@ -1,18 +1,18 @@
 import type { Metadata } from "next";
-import { Barlow_Condensed, DM_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
-const barlowCondensed = Barlow_Condensed({
+const barlowCondensed = localFont({
+  src: "./fonts/barlow-condensed-900.woff2",
   variable: "--font-barlow-condensed",
-  subsets: ["latin"],
-  weight: ["900"],
+  weight: "900",
   display: "swap",
 });
 
-const dmSans = DM_Sans({
+const dmSans = localFont({
+  src: "./fonts/dm-sans.woff2",
   variable: "--font-dm-sans",
-  subsets: ["latin"],
-  weight: ["400", "500"],
+  weight: "400 500",
   display: "swap",
 });
 
