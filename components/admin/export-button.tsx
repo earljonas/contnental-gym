@@ -10,7 +10,8 @@ type ExportColumn<T> = {
 };
 
 function csvEscape(value: unknown) {
-  const text = String(value ?? "");
+  const raw = String(value ?? "");
+  const text = typeof value !== "number" && /^[\s\uFEFF]*[=+\-@\t\r\n]/u.test(raw) ? `'${raw}` : raw;
   return `"${text.replaceAll('"', '""')}"`;
 }
 

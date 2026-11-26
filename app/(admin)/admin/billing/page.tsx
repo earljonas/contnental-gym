@@ -1,4 +1,5 @@
 import { ResourcePage } from "@/components/admin/resource-page";
+import { ReportUnavailable } from "@/components/admin/report-unavailable";
 import { ExportButton } from "@/components/admin/export-button";
 import { getBillingMemberOptions } from "@/lib/branch-admin/data";
 import { getSuperAdminOverview } from "@/lib/super-admin/data";
@@ -14,6 +15,7 @@ export default async function BillingPage({
 }) {
   const query = await searchParams;
   const overview = await getSuperAdminOverview();
+  if (overview.unavailable) return <ReportUnavailable title="Billing unavailable" href="/admin/billing" />;
   const supabase = await createClient();
 
   const [memberOptions, { data: branches }] = await Promise.all([

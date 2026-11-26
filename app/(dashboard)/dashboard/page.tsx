@@ -1,6 +1,9 @@
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { MemberHome } from "@/components/member/member-home";
-import { pickCurrentMembership } from "@/lib/member-membership";
+import { addGymDays, gymDate, gymDayStart, gymTimeZone } from "@/lib/gym/business-date";
+import { effectiveMembershipStatus, pickCurrentMembership } from "@/lib/member-membership";
+import { coachEnabledFor } from "@/lib/coach/config";
 import { getMemberAnnouncements } from "@/lib/announcements";
 
 export default async function DashboardPage() {
@@ -9,11 +12,13 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
+  if (!user) redirect("/login");
+
   // Profile
   const { data: profile } = await supabase
     .from("profiles")
     .select("first_name, last_name")
-    .eq("id", user!.id)
+    .eq("id", user.id)
     .single();
 
   type MembershipWithPlan = {
@@ -29,82 +34,52 @@ export default async function DashboardPage() {
   const { data: membershipData } = await supabase
     .from("memberships")
     .select("status, start_date, end_date, created_at, plan_id, membership_plans(name, price)")
-    .eq("user_id", user!.id)
+    .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(10);
 
   const membership = pickCurrentMembership((membershipData ?? []) as unknown as MembershipWithPlan[]);
 
-  // This week's attendance (Mon–Sun)
-  const now = new Date();
-  const dayOfWeek = now.getDay();
-  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-  const weekStart = new Date(now);
-  weekStart.setDate(now.getDate() + mondayOffset);
-  weekStart.setHours(0, 0, 0, 0);
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekStart.getDate() + 6);
-  weekEnd.setHours(23, 59, 59, 999);
-
-  const { data: weekAttendance } = await supabase
-    .from("attendance")
-    .select("id, check_in_time")
-    .eq("user_id", user!.id)
-    .gte("check_in_time", weekStart.toISOString())
-    .lte("check_in_time", weekEnd.toISOString())
-    .order("check_in_time", { ascending: true });
+  const today = gymDate();
+  const weekday = new Date(`${today}T00:00:00Z`).getUTCDay();
+  const weekStart = addGymDays(today, weekday === 0 ? -6 : 1 - weekday);
+  const { data: weekWorkouts } = await supabase
+    .from("workout_sessions")
+    .select("started_at")
+    .eq("user_id", user.id)
+    .gte("started_at", gymDayStart(weekStart))
+    .lt("started_at", gymDayStart(addGymDays(weekStart, 7)));
 
   // Streak calculation
   const { data: recentAttendance } = await supabase
     .from("attendance")
     .select("check_in_time")
-    .eq("user_id", user!.id)
+    .eq("user_id", user.id)
     .order("check_in_time", { ascending: false })
     .limit(90);
 
-  const attendanceDates = new Set(
-    (recentAttendance ?? []).map((a) =>
-      new Date(a.check_in_time).toISOString().split("T")[0]
-    )
-  );
-
+  const attendanceDates = new Set((recentAttendance ?? []).map((visit) => gymDate(new Date(visit.check_in_time))));
   let streak = 0;
-  const cursor = new Date();
-  const todayStr = cursor.toISOString().split("T")[0];
-  if (!attendanceDates.has(todayStr)) {
-    cursor.setDate(cursor.getDate() - 1);
-  }
-  for (let i = 0; i < 90; i++) {
-    const dateStr = cursor.toISOString().split("T")[0];
-    if (attendanceDates.has(dateStr)) {
-      streak++;
-      cursor.setDate(cursor.getDate() - 1);
-    } else {
-      break;
-    }
+  let cursor = attendanceDates.has(today) ? today : addGymDays(today, -1);
+  while (attendanceDates.has(cursor)) {
+    streak++;
+    cursor = addGymDays(cursor, -1);
   }
 
-  // Week days array for UI
-  const weekDays: { date: string; dayLabel: string; hasWorkout: boolean }[] = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(weekStart);
-    d.setDate(weekStart.getDate() + i);
-    const dateStr = d.toISOString().split("T")[0];
-    const dayLabel = d.toLocaleDateString("en-US", { weekday: "short" });
-    const hasWorkout = (weekAttendance ?? []).some(
-      (a) => new Date(a.check_in_time).toISOString().split("T")[0] === dateStr
-    );
-    weekDays.push({ date: dateStr, dayLabel, hasWorkout });
-  }
+  const workoutDates = new Set((weekWorkouts ?? []).map((session) => gymDate(new Date(session.started_at))));
+  const weekDays = Array.from({ length: 7 }, (_, index) => {
+    const date = addGymDays(weekStart, index);
+    const dayLabel = new Date(gymDayStart(date)).toLocaleDateString("en-PH", { weekday: "short", timeZone: gymTimeZone });
+    return { date, dayLabel, hasWorkout: workoutDates.has(date) };
+  });
+  const sessionsThisWeek = weekWorkouts?.length ?? 0;
+  const announcements = await getMemberAnnouncements(user.id);
 
-  const sessionsThisWeek = weekDays.filter((d) => d.hasWorkout).length;
-  const announcements = await getMemberAnnouncements(user!.id);
-
-  const todayRoutineLabel = new Date().toLocaleDateString("en-US", { weekday: "short" });
+  const todayRoutineLabel = new Date().toLocaleDateString("en-US", { weekday: "short", timeZone: gymTimeZone });
   const { data: routinesRaw } = await supabase
     .from("routines")
     .select("id, name, days, routine_exercises(id)")
-    .eq("user_id", user!.id)
+    .eq("user_id", user.id)
     .contains("days", [todayRoutineLabel])
     .order("created_at", { ascending: false });
 
@@ -117,11 +92,11 @@ export default async function DashboardPage() {
       : 0,
   }));
 
-  // Sessions for AI Coach context
+  // Recent completed workouts
   const { data: recentSessionsRaw } = await supabase
-    .from("sessions")
+    .from("workout_sessions")
     .select("started_at, ended_at, routine_name, total_volume, exercises")
-    .eq("user_id", user!.id)
+    .eq("user_id", user.id)
     .order("started_at", { ascending: false })
     .limit(10);
 
@@ -132,7 +107,7 @@ export default async function DashboardPage() {
     const exercises = Array.isArray(s.exercises) ? s.exercises : [];
     return {
       date: start.toLocaleDateString("en-US", {
-        weekday: "short",
+        timeZone: gymTimeZone, weekday: "short",
         month: "short",
         day: "numeric",
       }),
@@ -151,18 +126,14 @@ export default async function DashboardPage() {
 
   const plan = membership?.membership_plans;
 
-  let daysLeft: number | null = null;
-  if (membership?.end_date) {
-    const end = new Date(membership.end_date);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    daysLeft = Math.ceil((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-  }
+  const daysLeft = membership?.end_date
+    ? Math.round((Date.parse(gymDayStart(membership.end_date)) - Date.parse(gymDayStart(today))) / 86_400_000)
+    : null;
 
   return (
     <MemberHome
       firstName={profile?.first_name ?? "Member"}
-      membershipStatus={membership?.status ?? null}
+      membershipStatus={effectiveMembershipStatus(membership)}
       planName={plan?.name ?? null}
       daysLeft={daysLeft}
       sessionsThisWeek={sessionsThisWeek}
@@ -176,6 +147,7 @@ export default async function DashboardPage() {
         publishAt: announcement.publishAt,
       }))}
       recentSessions={recentSessions}
+      coachEnabled={coachEnabledFor(user.id)}
       todaysRoutines={todaysRoutines}
     />
   );

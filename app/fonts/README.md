@@ -4,3 +4,4 @@ These fonts use the SIL Open Font License 1.1. The license notices are included 
 
 - Barlow Condensed Black was converted to WOFF2 from [`BarlowCondensed-Black.ttf`](https://github.com/google/fonts/blob/60824dce48f7dd28fe7d65559f2da1f6e04e585b/ofl/barlowcondensed/BarlowCondensed-Black.ttf).
 - DM Sans was converted to WOFF2 from [`DMSans[opsz,wght].ttf`](https://github.com/google/fonts/blob/5b35b7208dd4100571326fdf37f030b32a524232/ofl/dmsans/DMSans%5Bopsz%2Cwght%5D.ttf).
+- Geist Sans comes from the [Geist 1.9.2 package](https://www.npmjs.com/package/geist/v/1.9.2).

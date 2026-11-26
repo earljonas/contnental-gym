@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getUserRole } from "@/lib/supabase/roles";
 
 export async function updateBranch(data: {
-  id: number;
+  id: number | null;
   name: string;
   location: string;
 }) {
@@ -28,20 +28,17 @@ export async function updateBranch(data: {
     const name = data.name.trim();
     const location = data.location.trim();
 
-    if (!name || !location) {
-      return { error: "Branch name and location are required." };
+    if (!name || !location || name.length > 100 || location.length > 250) {
+      return { error: "Enter a branch name (up to 100 characters) and address (up to 250 characters)." };
     }
 
-    const { data: branch, error } = await supabase
-      .from("branches")
-      .update({ name, location })
-      .eq("id", data.id)
-      .select("id, name, location")
-      .single();
+    const branches = supabase.from("branches");
+    const write = data.id === null ? branches.insert({ name, location }) : branches.update({ name, location }).eq("id", data.id);
+    const { data: branch, error } = await write.select("id, name, location").single();
 
     if (error || !branch) {
       console.error("[updateBranch] Error:", error);
-      return { error: "Unable to save branch changes." };
+      return { error: error?.code === "23505" ? "A branch with this name already exists." : "Unable to save branch changes." };
     }
 
     revalidatePath("/super-admin/branches");

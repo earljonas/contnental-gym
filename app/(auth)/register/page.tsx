@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
-import { checkRegistrationEmail } from "./actions";
+import { formatPlanPrice, getActivePlans, type PublicPlan } from "@/lib/gym/plans";
 
 /* ─── TYPES ─── */
 interface FormData {
@@ -21,48 +21,7 @@ interface FormData {
   otp: string[];
 }
 
-/* ─── PLANS ─── */
-const plans = [
-  {
-    id: "1-month",
-    name: "1 Month",
-    price: "₱1,000",
-    duration: "30 days",
-    dbId: 1,
-    popular: false,
-    bestValue: false,
-  },
-  {
-    id: "3-months",
-    name: "3 Months",
-    price: "₱2,700",
-    duration: "90 days",
-    dbId: 2,
-    popular: false,
-    bestValue: false,
-  },
-  {
-    id: "6-months",
-    name: "6 Months",
-    price: "₱5,100",
-    duration: "180 days",
-    dbId: 3,
-    popular: true,
-    bestValue: false,
-  },
-  {
-    id: "12-months",
-    name: "12 Months",
-    price: "₱9,600",
-    duration: "365 days",
-    dbId: 4,
-    popular: false,
-    bestValue: true,
-  },
-];
-
 const steps = ["Account", "Plan", "Verify", "Done"];
-const duplicateEmailMessage = "An account with this email already exists. Please sign in instead.";
 
 const pageVariants = {
   enter: (dir: number) => ({ x: dir > 0 ? 40 : -40, opacity: 0 }),
@@ -89,7 +48,27 @@ export default function RegisterPage() {
     otp: ["", "", "", "", "", ""],
   });
 
-  const supabase = createClient();
+  const [supabase] = useState(createClient);
+  const [plans, setPlans] = useState<PublicPlan[]>([]);
+  const [plansUnavailable, setPlansUnavailable] = useState(false);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [verified, setVerified] = useState(false);
+  const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    let current = true;
+    void getActivePlans(supabase).then((catalog) => {
+      if (!current) return;
+      setPlans(catalog.plans);
+      setPlansUnavailable(catalog.unavailable);
+      setCatalogLoading(false);
+    }).catch(() => {
+      if (!current) return;
+      setPlansUnavailable(true);
+      setCatalogLoading(false);
+    });
+    return () => { current = false; };
+  }, [supabase]);
 
   /* ─── HELPERS ─── */
   const set = (field: keyof FormData, value: string) => {
@@ -125,45 +104,14 @@ export default function RegisterPage() {
     setLoading(true);
     const email = form.email.trim().toLowerCase();
 
-    const emailCheck = await checkRegistrationEmail(email);
-    if (emailCheck.error) {
-      setErrors({ email: emailCheck.error });
-      setLoading(false);
-      setStep(0);
-      return;
-    }
-    if (emailCheck.exists) {
-      setErrors({ email: duplicateEmailMessage });
-      setLoading(false);
-      setStep(0);
-      return;
-    }
-
-    // Sign up with Supabase — this creates the auth user
-    // The trigger will auto-create the profile row
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+    const { error } = await supabase.auth.signUp({
       email,
       password: form.password,
-      options: {
-        data: {
-          first_name: form.firstName,
-          last_name: form.lastName,
-          phone: form.phone,
-          role: "MEMBER",
-        },
-      },
+      options: { data: { first_name: form.firstName.trim(), last_name: form.lastName.trim(), phone: form.phone.trim() } },
     });
-
-    if (signUpError) {
-      setErrors({ plan: signUpError.message });
+    if (error && error.code !== "user_already_exists" && error.code !== "email_exists") {
+      setErrors({ plan: "Could not send the code. Try again in a moment." });
       setLoading(false);
-      return;
-    }
-
-    if (signUpData.user?.identities && signUpData.user.identities.length === 0) {
-      setErrors({ email: duplicateEmailMessage });
-      setLoading(false);
-      setStep(0);
       return;
     }
 
@@ -190,52 +138,49 @@ export default function RegisterPage() {
   /* ─── STEP 2 → 3: Verify OTP ─── */
   const handleVerify = async () => {
     const code = form.otp.join("");
-    if (code.length < 6) { setErrors({ otp: "Enter the 6-digit code" }); return; }
-    setLoading(true);
-
-    const { error: verifyError } = await supabase.auth.verifyOtp({
-      email: form.email,
-      token: code,
-      type: "signup",
-    });
-
-    if (verifyError) {
-      setErrors({ otp: verifyError.message });
-      setLoading(false);
+    if (!verified && !/^\d{6}$/.test(code)) {
+      setErrors({ otp: "Enter the 6-digit code" });
       return;
     }
-
-    // Create membership record
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const selectedPlan = plans.find((p) => p.id === form.plan);
-      if (selectedPlan) {
-        const { data: livePlan } = await supabase
-          .from("membership_plans")
-          .select("id")
-          .eq("name", selectedPlan.name)
-          .maybeSingle();
-
-        await supabase.from("memberships").insert({
-          user_id: user.id,
-          plan_id: livePlan?.id ?? selectedPlan.dbId,
-          status: "PENDING",
-        });
+    setLoading(true);
+    setErrors({});
+    setNotice("");
+    try {
+      if (!verified) {
+        const { error } = await supabase.auth.verifyOtp({ email: form.email, token: code, type: "signup" });
+        if (error) {
+          setErrors({ otp: "This code could not be verified. Request a new code or sign in." });
+          return;
+        }
+        setVerified(true);
       }
+      const { error } = await supabase.rpc("enroll_member", { requested_plan: Number(form.plan) });
+      if (error) {
+        setErrors({ otp: error.code === "P0001" ? error.message : "Your email is verified. Try saving your plan again or open your dashboard." });
+        return;
+      }
+      next();
+    } catch {
+      setErrors({ otp: "Could not complete this step. Check your connection and try again." });
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
-    next();
   };
 
-  /* ─── RESEND OTP ─── */
   const handleResendOtp = async () => {
     setLoading(true);
-    await supabase.auth.resend({
-      type: "signup",
-      email: form.email,
-    });
-    setLoading(false);
+    setErrors({});
+    setNotice("");
+    try {
+      const { error } = await supabase.auth.resend({ type: "signup", email: form.email });
+      if (error && !["email_exists", "user_already_exists", "email_not_confirmed"].includes(error.code ?? "")) {
+        setErrors({ otp: "Could not resend the code yet. Wait a moment and try again." });
+      } else {
+        setNotice("If a code can be sent to this address, check your inbox.");
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   /* ─── SHARED STYLES ─── */
@@ -338,21 +283,21 @@ export default function RegisterPage() {
               </div>
               {errors.plan && <p className="mb-4 text-[12px] text-red-400">{errors.plan}</p>}
               <div className="space-y-3">
+                {catalogLoading && <p role="status" className="text-text-secondary">Loading plans…</p>}
+                {!catalogLoading && plans.length === 0 && <p className="text-text-secondary">{plansUnavailable ? "Plans are temporarily unavailable. Refresh to retry." : "No plans are open for enrollment."}</p>}
                 {plans.map((plan) => (
-                  <button key={plan.id} type="button" onClick={() => { setForm((p) => ({ ...p, plan: plan.id })); setErrors({}); }}
-                    className={`relative w-full border p-5 text-left transition-all ${form.plan === plan.id ? "border-white bg-white/5" : "border-border-subtle bg-surface hover:border-white/30"}`}>
-                    {plan.popular && <span className="absolute -top-2.5 right-4 bg-white px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-black">POPULAR</span>}
-                    {plan.bestValue && <span className="absolute -top-2.5 right-4 bg-gold px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-black">BEST VALUE</span>}
+                  <button key={plan.id} type="button" onClick={() => { setForm((p) => ({ ...p, plan: String(plan.id) })); setErrors({}); }}
+                    className={`relative w-full border p-5 text-left transition-all ${form.plan === String(plan.id) ? "border-white bg-white/5" : "border-border-subtle bg-surface hover:border-white/30"}`}>
                     <div className="flex items-center justify-between">
                       <div>
                         <h3 className="font-display text-lg font-black uppercase tracking-tight text-white">{plan.name}</h3>
                         <div className="mt-1 flex items-baseline gap-1">
-                          <span className="font-display text-2xl font-black text-white">{plan.price}</span>
-                          <span className="text-[12px] text-text-secondary">{plan.duration}</span>
+                          <span className="font-display text-2xl font-black text-white">{formatPlanPrice(plan.price)}</span>
+                          <span className="text-[12px] text-text-secondary">{plan.duration} days</span>
                         </div>
                       </div>
-                      <div className={`flex h-5 w-5 items-center justify-center rounded-full border-2 transition-colors ${form.plan === plan.id ? "border-white bg-white" : "border-border-subtle"}`}>
-                        {form.plan === plan.id && <div className="h-2 w-2 rounded-full bg-black" />}
+                      <div className={`flex h-5 w-5 items-center justify-center rounded-full border-2 transition-colors ${form.plan === String(plan.id) ? "border-white bg-white" : "border-border-subtle"}`}>
+                        {form.plan === String(plan.id) && <div className="h-2 w-2 rounded-full bg-black" />}
                       </div>
                     </div>
                   </button>
@@ -360,7 +305,7 @@ export default function RegisterPage() {
               </div>
               <div className="mt-8 flex gap-3">
                 <button onClick={back} className="flex h-12 flex-1 items-center justify-center border border-border-subtle text-[12px] font-medium uppercase tracking-[0.15em] text-white transition-colors hover:border-white hover:bg-white/5">BACK</button>
-                <button onClick={handlePlanNext} disabled={loading} className="flex h-12 flex-[2] items-center justify-center border border-white bg-white text-[12px] font-medium uppercase tracking-[0.15em] text-black transition-all hover:bg-white/90 disabled:opacity-50">
+                <button onClick={handlePlanNext} disabled={loading || !form.plan} className="flex h-12 flex-[2] items-center justify-center border border-white bg-white text-[12px] font-medium uppercase tracking-[0.15em] text-black transition-all hover:bg-white/90 disabled:opacity-50">
                   {loading ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-black border-t-transparent" /> : "CONTINUE"}
                 </button>
               </div>
@@ -388,10 +333,12 @@ export default function RegisterPage() {
                   />
                 ))}
               </div>
+              {notice && <p role="status" className="text-sm text-text-secondary">{notice}</p>}
+              {verified && <Link href="/dashboard/enroll" className="underline">Choose a plan in your dashboard</Link>}
               {errors.otp && <p className="mt-3 text-center text-[12px] text-red-400">{errors.otp}</p>}
               <p className="mt-6 text-center text-[13px] text-text-secondary">
                 Didn&apos;t receive it?{" "}
-                <button onClick={handleResendOtp} disabled={loading} className="text-white underline underline-offset-4 transition-colors hover:text-gold disabled:opacity-50">
+                <button onClick={handleResendOtp} disabled={loading || verified} className="text-white underline underline-offset-4 transition-colors hover:text-gold disabled:opacity-50">
                   Resend code
                 </button>
               </p>
@@ -421,8 +368,8 @@ export default function RegisterPage() {
                   <div className="flex justify-between"><span className="text-text-secondary">Email</span><span className="text-white">{form.email}</span></div>
                   <div className="flex justify-between"><span className="text-text-secondary">Phone</span><span className="text-white">{form.phone}</span></div>
                   <div className="h-px bg-border-subtle" />
-                  <div className="flex justify-between"><span className="text-text-secondary">Plan</span><span className="font-medium uppercase text-gold">{plans.find((p) => p.id === form.plan)?.name}</span></div>
-                  <div className="flex justify-between"><span className="text-text-secondary">Price</span><span className="text-white">{plans.find((p) => p.id === form.plan)?.price}</span></div>
+                  <div className="flex justify-between"><span className="text-text-secondary">Plan</span><span className="font-medium uppercase text-gold">{plans.find((p) => String(p.id) === form.plan)?.name}</span></div>
+                  <div className="flex justify-between"><span className="text-text-secondary">Price</span><span className="text-white">{formatPlanPrice(plans.find((p) => String(p.id) === form.plan)?.price ?? 0)}</span></div>
                   <div className="flex justify-between"><span className="text-text-secondary">Status</span><span className="text-[12px] uppercase tracking-wider text-yellow-500">Pending Activation</span></div>
                 </div>
               </div>

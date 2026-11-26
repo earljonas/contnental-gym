@@ -55,6 +55,7 @@ interface MemberHomeProps {
     publishAt: string;
   }[];
   recentSessions: RecentSession[];
+  coachEnabled: boolean;
   todaysRoutines: ScheduledRoutine[];
 }
 
@@ -146,6 +147,7 @@ export function MemberHome({
   streak,
   announcements,
   recentSessions,
+  coachEnabled,
   todaysRoutines,
 }: MemberHomeProps) {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
@@ -349,7 +351,7 @@ export function MemberHome({
           </span>
         </Link>
 
-        <button
+        {coachEnabled && (        <button
           onClick={() => setCoachOpen(true)}
           className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card px-4 py-5 transition-all hover:bg-muted active:scale-[0.97]"
         >
@@ -359,23 +361,13 @@ export function MemberHome({
           <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground">
             AI Coach
           </span>
-        </button>
+        </button>)}
       </div>
 
-      <CoachChat
-        open={coachOpen}
-        onClose={() => setCoachOpen(false)}
-        context={{
-          firstName,
-          membershipStatus,
-          planName,
-          daysLeft,
-          streak,
-          sessionsThisWeek,
-          weeklyGoal,
-          recentSessions,
-        }}
-      />
+      {coachEnabled && <CoachChat open={coachOpen} onClose={() => setCoachOpen(false)} />}
+      {!membershipStatus && (
+        <Link href="/dashboard/enroll" className="inline-flex min-h-11 items-center rounded-lg border px-4 text-sm font-medium">Choose a membership plan</Link>
+      )}
 
       <div className="overflow-hidden rounded-2xl border border-border bg-card">
         <div className="border-b border-border px-5 py-3">

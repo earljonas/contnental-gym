@@ -1,0 +1,27 @@
+name: Staging smoke
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 5
+    env:
+      STAGING_ORIGIN: ${{ vars.STAGING_ORIGIN }}
+    steps:
+      - name: Verify the configured HTTPS deployment
+        run: |
+          if [[ ! "$STAGING_ORIGIN" =~ ^https://[a-zA-Z0-9.-]+$ ]]; then
+            echo 'Set STAGING_ORIGIN to the HTTPS origin of the staging deployment.' >&2
+            exit 1
+          fi
+          curl -fsS --max-time 10 -o /dev/null "$STAGING_ORIGIN/"
+          curl -fsS --max-time 10 -o /dev/null "$STAGING_ORIGIN/api/health"
+          redirect=$(curl -sS --max-time 10 -o /dev/null -w '%{http_code} %{redirect_url}' "$STAGING_ORIGIN/dashboard")
+          test "$redirect" = "307 $STAGING_ORIGIN/login"
+          coach=$(curl -sS --max-time 10 -o /dev/null -w '%{http_code}' -X POST "$STAGING_ORIGIN/api/coach")
+          test "$coach" = 404

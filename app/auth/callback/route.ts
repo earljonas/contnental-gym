@@ -19,7 +19,7 @@ export async function GET(request: Request) {
 
       if (user) {
         const roleInfo = await getUserRole(supabase, user.id);
-        const redirectTo = next === "/dashboard" ? getRouteForRole(roleInfo.role) : next;
+        const redirectTo = next === "/reset-password" ? next : getRouteForRole(roleInfo.role);
         return NextResponse.redirect(`${origin}${redirectTo}`);
       }
     }

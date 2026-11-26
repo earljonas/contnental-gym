@@ -2,100 +2,41 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getUserRole } from "@/lib/supabase/roles";
-import { lookupMemberForCheckIn, type MemberLookup } from "@/lib/branch-admin/data";
+import { lookupMemberForCheckIn, type MemberLookup, type SearchableMember } from "@/lib/branch-admin/data";
+
+const uuidPattern = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
 export async function checkInMember(
   memberId: string,
-  method: "QR" | "Manual"
+  method: "QR" | "Manual",
 ): Promise<{ success?: boolean; error?: string; member?: MemberLookup }> {
-  try {
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return { error: "Not authenticated" };
-
-    const roleInfo = await getUserRole(supabase, user.id);
-    if (roleInfo.role !== "BRANCH_ADMIN" || !roleInfo.branch_id) {
-      return { error: "Unauthorized" };
-    }
-
-    // Look up the member
-    const member = await lookupMemberForCheckIn(memberId);
-    if (!member) return { error: "Member not found" };
-
-    // Only allow check-in for active members
-    if (member.membershipStatus !== "ACTIVE") {
-      return { member, error: `Membership is ${member.membershipStatus}` };
-    }
-
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
-
-    const { data: existingCheckIn, error: existingCheckInError } = await supabase
-      .from("attendance")
-      .select("id")
-      .eq("user_id", memberId)
-      .gte("check_in_time", todayStart.toISOString())
-      .lte("check_in_time", todayEnd.toISOString())
-      .limit(1)
-      .maybeSingle();
-
-    if (existingCheckInError) {
-      console.error("[checkInMember] duplicate check failed:", existingCheckInError);
-      return { error: "Failed to verify today's check-in" };
-    }
-
-    if (existingCheckIn) {
-      return { member, error: "Already checked in today" };
-    }
-
-    // Insert attendance record
-    const { error: insertError } = await supabase.from("attendance").insert({
-      user_id: memberId,
-      branch_id: roleInfo.branch_id,
-      checked_in_by: method === "Manual" ? user.id : null,
-      check_in_time: new Date().toISOString(),
-    });
-
-    if (insertError) {
-      console.error("[checkInMember] insert failed:", insertError);
-      return { error: "Failed to record check-in" };
-    }
-
-    revalidatePath("/branch/attendance");
-    return { success: true, member };
-  } catch (err) {
-    console.error("[checkInMember] Unexpected error:", err);
-    return { error: "Unexpected error occurred" };
+  if (!uuidPattern.test(memberId)) return { error: "Member not found" };
+  const supabase = await createClient();
+  const { data: result, error } = await supabase.rpc("record_gym_visit", {
+    target_member: memberId, visit_method: method,
+  });
+  if (error) {
+    if (error.code !== "42501") console.error("gym.checkin.failed", { code: error.code });
+    return { error: error.code === "42501" ? "Branch staff access required" : "Could not record the visit. Try again." };
   }
+  if (result === "NONE") return { error: "Member not found" };
+  const member = await lookupMemberForCheckIn(memberId);
+  if (result === "DUPLICATE") return { error: "Already checked in today", member: member ?? undefined };
+  if (result !== "RECORDED") return { error: `Membership is ${result}`, member: member ?? undefined };
+  revalidatePath("/branch");
+  revalidatePath("/branch/attendance");
+  return { success: true, member: member ?? undefined };
 }
 
-export async function lookupMemberAction(
-  memberId: string
-): Promise<{ member?: MemberLookup; error?: string }> {
-  try {
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return { error: "Not authenticated" };
-
-    const roleInfo = await getUserRole(supabase, user.id);
-    if (roleInfo.role !== "BRANCH_ADMIN" || !roleInfo.branch_id) {
-      return { error: "Unauthorized" };
-    }
-
-    const member = await lookupMemberForCheckIn(memberId);
-    if (!member) return { error: "Member not found" };
-
-    return { member };
-  } catch {
-    return { error: "Lookup failed" };
-  }
+export async function searchCheckInMembers(query: string): Promise<{ members: SearchableMember[]; error?: string }> {
+  const name = query.trim();
+  if (name.length < 2 || name.length > 80) return { members: [] };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("checkin_directory", { name_filter: name });
+  if (error) return { members: [], error: "Search is unavailable. Try again." };
+  return {
+    members: (data ?? []).map((member: { id: string; first_name: string; last_name: string }) => ({
+      id: member.id, name: `${member.first_name} ${member.last_name}`.trim(),
+    })),
+  };
 }

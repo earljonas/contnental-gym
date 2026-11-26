@@ -22,7 +22,7 @@ Copy [`.env.example`](../.env.example) to `.env.local` and fill in the values fo
 | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL. |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | The project’s publishable key or legacy `anon` key. Keep the variable name as written. |
-| `SUPABASE_SERVICE_ROLE_KEY` | The project’s backend secret key or legacy `service_role` key. Used for walk-in registration, staff completion of existing registrations, and the optional duplicate-email check during signup. Keep it server-side. |
+| `SUPABASE_SERVICE_ROLE_KEY` | The project’s backend secret key or legacy `service_role` key. Used for walk-in Auth provisioning and optional coach metering. Keep it server-side. |
 | `OLLAMA_URL` | Optional. Defaults to `http://localhost:11434` from the Next.js server’s point of view. |
 | `OLLAMA_MODEL` | Optional. Defaults to `llama3.1`. |
 
@@ -30,66 +30,23 @@ Find the URL in your project’s connection settings and the keys under **Settin
 
 ## Initialize the database
 
-In an empty development Supabase project, run each file once in the SQL Editor, in the order shown. Start with the base schema and apply the role-routing patch before the feature patches that use its role helpers.
+Use the [ordered migrations](../supabase/migrations) for a fresh Supabase project. The first migration is a baseline from the legacy schema, feature patches, and explicit grants. The later migrations enforce enrollment and payment state, visit eligibility, workout saves, provider budgets, and optional staff MFA.
 
-| Order | SQL file | Purpose |
-| --- | --- | --- |
-| 1 | [`schema.sql`](../supabase/schema.sql) | Base tables, policies, branch and plan data, and signup trigger. |
-| 2 | [`patch-fix-role-routing.sql`](../supabase/patch-fix-role-routing.sql) | Role lookup table, profile-to-role synchronization, and policy helpers. |
-| 3 | [`patch-branch-admin-walkups.sql`](../supabase/patch-branch-admin-walkups.sql) | Branch staff access to pending online registrations. |
-| 4 | [`patch-fix-branch-activation-rls.sql`](../supabase/patch-fix-branch-activation-rls.sql) | Activation policies and repair for certain incomplete activations. |
-| 5 | [`patch-all-branch-member-access.sql`](../supabase/patch-all-branch-member-access.sql) | Cross-branch check-in lookup and staff profile editing. |
-| 6 | [`patch-collection-branch-billing.sql`](../supabase/patch-collection-branch-billing.sql) | Payment collection-branch field, backfill, and policies. |
-| 7 | [`patch-membership-plan-labels.sql`](../supabase/patch-membership-plan-labels.sql) | Plan data used by the signup flow. |
-| 8 | [`patch-workout-sessions.sql`](../supabase/patch-workout-sessions.sql) | Routines, routine exercises, and completed workout sessions. |
-| 9 | [`patch-body-metrics.sql`](../supabase/patch-body-metrics.sql) | Member body measurement logs. |
-| 10 | [`patch-announcements.sql`](../supabase/patch-announcements.sql) | Announcements and feed policies. |
-| 11 | [`patch-walk-in-registration-support.sql`](../supabase/patch-walk-in-registration-support.sql) | Indexes used by member, plan, payment, and attendance lookups. |
+For local Supabase, run the pinned CLI from the repository root with Docker running.
 
-The base schema and role-routing patch cover the fresh-install changes from the older email, recursion, and role-isolation patches. For a database that already has project data, identify which patches are installed before making schema changes. The base schema and several policy definitions are intended to run once.
-
-The sequence and grants below were checked on an empty PostgreSQL 15 instance using stand-ins for Supabase’s `auth.users` and `auth.uid()`. The check covered schema creation, seed plans, role synchronization, basic member writes, and branch activation, payment, and attendance writes. Supabase Auth, email delivery, and HTTP Data API behavior require their own checks.
-
-### Data API grants
-
-On Supabase projects with explicit Data API grants, run the following after the schema is installed. These grants cover the app’s authenticated reads and writes, plus the backend operations used in staff registration. Row-level security still governs access for authenticated users. [Supabase Data API permissions](https://supabase.com/docs/guides/api/securing-your-api)
-
-```sql
-grant usage on schema public to authenticated, service_role;
-
-grant select on public.branches, public.profiles, public.user_roles,
-  public.membership_plans, public.memberships, public.payments, public.attendance,
-  public.routines, public.routine_exercises, public.workout_sessions,
-  public.body_metrics, public.announcements to authenticated;
-
-grant insert on public.membership_plans, public.memberships, public.payments,
-  public.attendance, public.routines, public.routine_exercises,
-  public.workout_sessions, public.body_metrics, public.announcements to authenticated;
-grant update on public.branches, public.membership_plans, public.memberships,
-  public.payments, public.routines to authenticated;
-grant update (first_name, last_name, phone, avatar_url, branch_id, updated_at)
-  on public.profiles to authenticated;
-grant delete on public.routines, public.routine_exercises, public.body_metrics,
-  public.announcements to authenticated;
-grant usage on sequence public.membership_plans_id_seq, public.memberships_id_seq,
-  public.payments_id_seq, public.attendance_id_seq, public.routines_id_seq,
-  public.routine_exercises_id_seq, public.workout_sessions_id_seq,
-  public.body_metrics_id_seq, public.announcements_id_seq to authenticated;
-grant execute on function public.is_super_admin(), public.is_branch_admin(),
-  public.is_admin(), public.my_branch_id(),
-  public.branch_admin_can_manage_member(uuid),
-  public.branch_admin_update_member_profile(uuid, text, text, text) to authenticated;
-
-grant select, insert, update on public.profiles to service_role;
-grant select, insert, delete on public.memberships to service_role;
-grant insert on public.payments to service_role;
-grant usage on sequence public.memberships_id_seq, public.payments_id_seq to service_role;
+```bash
+npx --yes supabase@3.4.0 start
+npx --yes supabase@3.4.0 db reset
 ```
+
+Use Supabase CLI with a disposable project or apply the migration SQL in order using the staging project’s SQL editor. On an existing database installed from the legacy scripts, verify the schema and grants already match the baseline before marking version `20261126000100` applied. Apply later migrations in order to a restored copy first. Review existing roles, visit duplicates and ambiguous receipts using the [pilot runbook](PILOT_RUNBOOK.md). The hardening migration preserves historical rows for reconciliation.
+
+The local configuration enables email confirmation and exposes Mailpit. Use the CLI status output to find the local API and mail inbox addresses. The PostgreSQL CI job applies the full sequence and checks role isolation and mutations with fictional users. Use an actual Supabase stack when verifying email and JWT behavior.
 
 ### Signup and staff accounts
 
 1. Enable the email provider and email confirmation in Supabase Auth. Edit **Confirm sign up** to include `{{ .Token }}` so the message contains the six-digit code the registration form expects. Set the Auth Site URL to `http://localhost:3000` for local development. [Supabase email templates](https://supabase.com/docs/guides/auth/auth-email-templates)
-2. For the member flow, use `/register` once the dev server is running. Select a plan and enter the emailed code. The app attempts to create a pending membership after verification. Check for that record before continuing to activation.
+2. For the member flow, use `/register` once the dev server is running. Select a plan and enter the emailed code. The app creates the pending membership after verification and advances only after that write succeeds. Check for that record before continuing to activation.
 3. For staff, create two confirmed test users with passwords in Supabase Auth. Copy their user IDs and run the following in the SQL Editor. Replace both UUID placeholders and choose an existing branch ID from the first query.
 
 ```sql
@@ -126,7 +83,7 @@ ollama serve
 ollama pull llama3.1
 ```
 
-Run the second command in a separate terminal if `ollama serve` is running in the foreground. Set `OLLAMA_URL` and `OLLAMA_MODEL` in `.env.local` if you use another endpoint or model, then restart Next.js. The model server receives the member context described in the [architecture guide](ARCHITECTURE.md#ai-coach). [Ollama model page](https://ollama.com/library/llama3.1)
+Run the second command in a separate terminal if `ollama serve` is running in the foreground. Set `COACH_PROVIDER=ollama` and allow fictional members with `COACH_MEMBER_IDS`. Set `OLLAMA_URL` and `OLLAMA_MODEL` if you use another endpoint or model, and restart Next.js. If a member opts in, the model server receives the workout context described in the [architecture guide](ARCHITECTURE.md#ai-coach). [Ollama model page](https://ollama.com/library/llama3.1)
 
 ## Verify the main workflows
 
@@ -151,4 +108,4 @@ npm run start
 
 `npm run start` serves the output of the production build. Barlow Condensed and DM Sans are bundled with the app and served locally. See the [font licenses and sources](../app/fonts/README.md).
 
-Deployment requires a Next.js server runtime for session handling, Server Actions, and the streaming coach endpoint. Configure the Supabase URL, keys, and Auth Site URL for the target environment. Review account-role provisioning and database permissions before enabling public registration. A hosted coach requires an Ollama endpoint reachable from the deployment.
+Deployment requires a Next.js server runtime for session handling, Server Actions, and the streaming coach endpoint. Configure the Supabase URL, keys, and Auth Site URL for the target environment. Review account-role provisioning and database permissions before enabling public registration. Keep the coach disabled for the first operational pilot. See the [pilot runbook](PILOT_RUNBOOK.md) for staging, monitoring, restore drills, and coach evaluation.

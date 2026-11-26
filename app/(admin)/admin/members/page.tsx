@@ -1,4 +1,5 @@
 import { ResourcePage } from "@/components/admin/resource-page";
+import { ReportUnavailable } from "@/components/admin/report-unavailable";
 import { ExportButton } from "@/components/admin/export-button";
 import { getSuperAdminOverview } from "@/lib/super-admin/data";
 import { getMemberDetails } from "./actions";
@@ -11,6 +12,7 @@ export default async function MembersPage({
 }) {
   const query = await searchParams;
   const overview = await getSuperAdminOverview();
+  if (overview.unavailable) return <ReportUnavailable title="Member report unavailable" href="/admin/members" />;
 
   let details = null;
   if (query.memberId) {

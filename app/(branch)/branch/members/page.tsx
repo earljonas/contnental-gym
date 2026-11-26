@@ -10,16 +10,16 @@ import { createClient } from "@/lib/supabase/server";
 import { getUserRole } from "@/lib/supabase/roles";
 
 // Reuse the pending members fetcher from the dashboard data layer
-async function getPendingWalkups() {
+async function getPendingWalkups(branchId: number) {
   const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "id, first_name, last_name, email, created_at, memberships(id, status, plan_id, membership_plans(name, price))"
+      "id, first_name, last_name, email, created_at, memberships(id, status, plan_id, quoted_price, quoted_duration, membership_plans(name, price, duration))"
     )
     .eq("role", "MEMBER")
-    .is("branch_id", null)
+    .or(`branch_id.is.null,branch_id.eq.${branchId}`)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -44,6 +44,7 @@ async function getPendingWalkups() {
       const plan = pendingMembership?.membership_plans as unknown as {
         name: string;
         price: number;
+        duration: number;
       } | null;
 
       return {
@@ -51,7 +52,8 @@ async function getPendingWalkups() {
         name: `${profile.first_name} ${profile.last_name}`.trim(),
         email: profile.email,
         plan: plan?.name ?? "No plan",
-        planPrice: plan?.price ?? 0,
+        planPrice: pendingMembership?.quoted_price ?? plan?.price ?? 0,
+        planDuration: pendingMembership?.quoted_duration ?? plan?.duration ?? 0,
         membershipId: pendingMembership?.id ?? 0,
         planId: pendingMembership?.plan_id ?? 0,
         registeredDate: new Date(profile.created_at).toLocaleDateString(
@@ -81,18 +83,20 @@ export default async function MembersPage({
 
   const params = await searchParams;
 
-  const [data, pendingWalkups, memberDetails, planOptions] = await Promise.all([
+  const [data, pendingWalkups, memberDetails, planOptions, branch] = await Promise.all([
     getBranchMembers(roleInfo.branch_id),
-    getPendingWalkups(),
+    getPendingWalkups(roleInfo.branch_id),
     params.memberId
       ? getBranchMemberDetails(params.memberId, roleInfo.branch_id)
       : Promise.resolve(null),
     getBranchPlanOptions(),
+    supabase.from("branches").select("name").eq("id", roleInfo.branch_id).maybeSingle(),
   ]);
 
   return (
     <BranchMembersPage
       data={data}
+      branchName={branch.data?.name ?? "Current branch"}
       pendingWalkups={pendingWalkups}
       memberDetails={memberDetails}
       planOptions={planOptions}

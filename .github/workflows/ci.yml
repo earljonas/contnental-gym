@@ -9,6 +9,39 @@ permissions:
   contents: read
 
 jobs:
+  database:
+    name: Verify database migrations and pilot rules
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: ci-local-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGUSER: postgres
+      PGDATABASE: postgres
+      PGPASSWORD: ci-local-only
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Apply migrations and run SQL assertions
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -f supabase/tests/bootstrap.sql
+          for migration in supabase/migrations/*.sql; do
+            psql -X -v ON_ERROR_STOP=1 --single-transaction -f "$migration"
+          done
+          psql -X -v ON_ERROR_STOP=1 -f supabase/tests/pilot_operations.sql
+
   verify:
     name: Verify production build
     runs-on: ubuntu-latest
@@ -45,3 +78,5 @@ jobs:
             echo "Expected an anonymous dashboard redirect to login, got: $redirect" >&2
             exit 1
           fi
+          coach_status=$(curl --silent --show-error --max-time 5 --output /dev/null --write-out '%{http_code}' -X POST "$base_url/api/coach")
+          test "$coach_status" = 404

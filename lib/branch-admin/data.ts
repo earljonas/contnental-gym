@@ -1,5 +1,6 @@
+import { addGymDays, gymDate, gymDayStart, gymTimeZone, isGymDate } from "@/lib/gym/business-date";
 import { createClient } from "@/lib/supabase/server";
-import { pickCurrentMembership } from "@/lib/member-membership";
+import { effectiveMembershipStatus, pickCurrentMembership } from "@/lib/member-membership";
 
 export type BranchCheckIn = {
   memberName: string;
@@ -12,6 +13,7 @@ export type PendingMember = {
   email: string;
   plan: string;
   planPrice: number;
+  planDuration: number;
   membershipId: number;
   planId: number;
   registeredDate: string;
@@ -46,13 +48,10 @@ export type BranchDashboardData = {
 export async function getBranchDashboard(branchId: number): Promise<BranchDashboardData> {
   const supabase = await createClient();
 
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-
-  const yesterdayStart = new Date(todayStart);
-  yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-  const yesterdayEnd = new Date(todayStart);
-  yesterdayEnd.setMilliseconds(-1);
+  const today = gymDate();
+  const todayStart = new Date(gymDayStart(today));
+  const yesterdayStart = new Date(gymDayStart(addGymDays(today, -1)));
+  const yesterdayEnd = new Date(todayStart.getTime() - 1);
 
   const [
     allMembersResult,
@@ -78,7 +77,7 @@ export async function getBranchDashboard(branchId: number): Promise<BranchDashbo
     // Active members registered through this branch. This does not limit access.
     supabase
       .from("profiles")
-      .select("id, memberships(status)")
+      .select("id, memberships(status, start_date, end_date)")
       .eq("role", "MEMBER")
       .eq("branch_id", branchId),
 
@@ -102,9 +101,9 @@ export async function getBranchDashboard(branchId: number): Promise<BranchDashbo
     // Pending activation queue — members with PENDING membership and no branch assignment
     supabase
       .from("profiles")
-      .select("id, first_name, last_name, email, created_at, memberships(id, status, plan_id, membership_plans(name, price))")
+      .select("id, first_name, last_name, email, created_at, memberships(id, status, plan_id, quoted_price, quoted_duration, membership_plans(name, price, duration))")
       .eq("role", "MEMBER")
-      .is("branch_id", null)
+      .or(`branch_id.is.null,branch_id.eq.${branchId}`)
       .order("created_at", { ascending: false }),
   ]);
 
@@ -130,14 +129,15 @@ export async function getBranchDashboard(branchId: number): Promise<BranchDashbo
     .map((profile) => {
       const memberships = Array.isArray(profile.memberships) ? profile.memberships : [];
       const pendingMembership = memberships.find((m) => m.status === "PENDING");
-      const plan = pendingMembership?.membership_plans as unknown as { name: string; price: number } | null;
+      const plan = pendingMembership?.membership_plans as unknown as { name: string; price: number; duration: number } | null;
 
       return {
         id: profile.id,
         name: `${profile.first_name} ${profile.last_name}`.trim(),
         email: profile.email,
         plan: plan?.name ?? "No plan",
-        planPrice: plan?.price ?? 0,
+        planPrice: pendingMembership?.quoted_price ?? plan?.price ?? 0,
+        planDuration: pendingMembership?.quoted_duration ?? plan?.duration ?? 0,
         membershipId: pendingMembership?.id ?? 0,
         planId: pendingMembership?.plan_id ?? 0,
         registeredDate: new Date(profile.created_at).toLocaleDateString("en-US", {
@@ -151,7 +151,7 @@ export async function getBranchDashboard(branchId: number): Promise<BranchDashbo
   const registeredHere = registeredHereResult.count ?? 0;
   const activeMembers = (registeredHereProfilesResult.data ?? []).filter((profile) => {
     const memberships = Array.isArray(profile.memberships) ? profile.memberships : [];
-    return memberships.some((membership) => membership.status === "ACTIVE");
+    return memberships.some((membership) => effectiveMembershipStatus(membership) === "ACTIVE");
   }).length;
   const todayCheckIns = todayAttendanceResult.data?.length ?? 0;
   const yesterdayCheckIns = yesterdayAttendanceResult.count ?? 0;
@@ -166,7 +166,7 @@ export async function getBranchDashboard(branchId: number): Promise<BranchDashbo
     {
       label: "Registered Here",
       value: registeredHere.toLocaleString(),
-      delta: `${totalMembers.toLocaleString()} total across all branches`,
+      delta: `${totalMembers.toLocaleString()} visible to this branch`,
       trend: "neutral",
       href: "/branch/members",
     },
@@ -236,6 +236,8 @@ export type MemberLookup = {
   avatarUrl: string | null;
   membershipStatus: "ACTIVE" | "EXPIRED" | "PENDING" | "CANCELLED" | "NONE";
   branchId: number | null;
+  lastVisitAt: string | null;
+  lastVisitBranch: string | null;
 };
 
 export type SearchableMember = {
@@ -249,74 +251,41 @@ export async function getBranchAttendance(
 ): Promise<BranchAttendanceData> {
   const supabase = await createClient();
 
-  // Target date (defaults to today)
-  const targetDate = dateFilter ? new Date(dateFilter) : new Date();
-  const dayStart = new Date(targetDate);
-  dayStart.setHours(0, 0, 0, 0);
-  const dayEnd = new Date(targetDate);
-  dayEnd.setHours(23, 59, 59, 999);
-
-  // Week boundaries (Monday–Sunday)
-  const today = new Date();
-  const dayOfWeek = today.getDay();
-  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-  const weekStart = new Date(today);
-  weekStart.setDate(today.getDate() + mondayOffset);
-  weekStart.setHours(0, 0, 0, 0);
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekStart.getDate() + 6);
-  weekEnd.setHours(23, 59, 59, 999);
-
-  // Today boundaries
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const todayEnd = new Date();
-  todayEnd.setHours(23, 59, 59, 999);
+  const today = gymDate();
+  const targetDay = isGymDate(dateFilter) ? dateFilter : today;
+  const weekday = new Date(`${today}T00:00:00Z`).getUTCDay();
+  const weekStart = addGymDays(today, weekday === 0 ? -6 : 1 - weekday);
+  const weekEnd = addGymDays(weekStart, 7);
 
   const [dayLogResult, todayCountResult, weekResult] = await Promise.all([
-    // Log for the selected date
-    supabase
-      .from("attendance")
-      .select("id, user_id, check_in_time, checked_in_by, profiles!attendance_user_id_fkey(first_name, last_name)")
-      .eq("branch_id", branchId)
-      .gte("check_in_time", dayStart.toISOString())
-      .lte("check_in_time", dayEnd.toISOString())
-      .order("check_in_time", { ascending: false }),
+    supabase.rpc("branch_visit_log", { day: targetDay }),
 
     // Today's count
     supabase
       .from("attendance")
       .select("id", { count: "exact", head: true })
       .eq("branch_id", branchId)
-      .gte("check_in_time", todayStart.toISOString())
-      .lte("check_in_time", todayEnd.toISOString()),
+      .gte("check_in_time", gymDayStart(today))
+      .lt("check_in_time", gymDayStart(addGymDays(today, 1))),
 
     // This week's attendance for summary
     supabase
       .from("attendance")
       .select("check_in_time")
       .eq("branch_id", branchId)
-      .gte("check_in_time", weekStart.toISOString())
-      .lte("check_in_time", weekEnd.toISOString()),
+      .gte("check_in_time", gymDayStart(weekStart))
+      .lt("check_in_time", gymDayStart(weekEnd)),
   ]);
 
-  // Process log rows
-  const log: AttendanceLogRow[] = (dayLogResult.data ?? []).map((row) => {
-    const profile = row.profiles as unknown as { first_name: string; last_name: string } | null;
-    const time = new Date(row.check_in_time).toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-    });
-    // If checked_in_by is set and differs from user_id, it was a manual check-in
-    const method: "QR" | "Manual" = row.checked_in_by ? "Manual" : "QR";
-
-    return {
-      id: row.id,
-      memberName: profile ? `${profile.first_name} ${profile.last_name}`.trim() : "Member",
-      time,
-      method,
-    };
-  });
+  const dayRows = (dayLogResult.data ?? []) as { id: number; member_name: string; check_in_time: string; method: "QR" | "Manual" }[];
+  const log: AttendanceLogRow[] = dayRows.map((row) => ({
+    id: row.id,
+    memberName: row.member_name,
+    time: new Date(row.check_in_time).toLocaleTimeString("en-PH", {
+      hour: "numeric", minute: "2-digit", timeZone: gymTimeZone,
+    }),
+    method: row.method,
+  }));
 
   // Week stats
   const weekData = weekResult.data ?? [];
@@ -324,10 +293,9 @@ export async function getBranchAttendance(
 
   // Busiest day calculation
   const dayCounts: Record<string, number> = {};
-  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   for (const row of weekData) {
     const d = new Date(row.check_in_time);
-    const dayName = dayNames[d.getDay()];
+    const dayName = d.toLocaleDateString("en-PH", { weekday: "long", timeZone: gymTimeZone });
     dayCounts[dayName] = (dayCounts[dayName] ?? 0) + 1;
   }
 
@@ -354,51 +322,18 @@ export async function getBranchAttendance(
 export async function lookupMemberForCheckIn(memberId: string): Promise<MemberLookup | null> {
   const supabase = await createClient();
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id, first_name, last_name, avatar_url, branch_id, memberships(status)")
-    .eq("id", memberId)
-    .eq("role", "MEMBER")
-    .single();
-
-  if (!profile) return null;
-
-  const memberships = Array.isArray(profile.memberships) ? profile.memberships : [];
-  let status: MemberLookup["membershipStatus"] = "NONE";
-
-  if (memberships.some((m) => m.status === "ACTIVE")) {
-    status = "ACTIVE";
-  } else if (memberships.some((m) => m.status === "PENDING")) {
-    status = "PENDING";
-  } else if (memberships.some((m) => m.status === "EXPIRED")) {
-    status = "EXPIRED";
-  } else if (memberships.some((m) => m.status === "CANCELLED")) {
-    status = "CANCELLED";
-  }
-
+  const { data: member } = await supabase.rpc("checkin_directory", { member_filter: memberId }).maybeSingle();
+  const row = member as { id: string; first_name: string; last_name: string; membership_status: MemberLookup["membershipStatus"]; last_visit_at: string | null; last_visit_branch: string | null } | null;
+  if (!row) return null;
   return {
-    id: profile.id,
-    name: `${profile.first_name} ${profile.last_name}`.trim(),
-    avatarUrl: profile.avatar_url ?? null,
-    membershipStatus: status,
-    branchId: profile.branch_id,
+    id: row.id,
+    name: `${row.first_name} ${row.last_name}`.trim(),
+    avatarUrl: null,
+    membershipStatus: row.membership_status,
+    branchId: null,
+    lastVisitAt: row.last_visit_at,
+    lastVisitBranch: row.last_visit_branch,
   };
-}
-
-export async function getSearchableMembers(branchId: number): Promise<SearchableMember[]> {
-  const supabase = await createClient();
-  void branchId;
-
-  const { data } = await supabase
-    .from("profiles")
-    .select("id, first_name, last_name")
-    .eq("role", "MEMBER")
-    .order("first_name");
-
-  return (data ?? []).map((p) => ({
-    id: p.id,
-    name: `${p.first_name} ${p.last_name}`.trim(),
-  }));
 }
 
 export async function getBranchPlanOptions(): Promise<BranchPlanOption[]> {
@@ -560,7 +495,7 @@ export async function getBranchMembers(branchId: number): Promise<BranchMembersD
       email: p.email,
       homeBranch: (branch as { name?: string } | null)?.name ?? "Unassigned",
       plan: plan?.name ?? "No plan",
-      status: latestMembership?.status ?? "NONE",
+      status: effectiveMembershipStatus(latestMembership) ?? "NONE",
       joined: new Date(p.created_at).toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
@@ -695,6 +630,7 @@ type BillingMemberProfileRow = {
 };
 
 type BillingMemberMembershipRow = {
+  quoted_price?: number | null;
   id: number;
   user_id: string;
   status: string;
@@ -840,7 +776,7 @@ export async function getBillingMemberOptions(
       .order("first_name"),
     supabase
       .from("memberships")
-      .select("id, user_id, status, created_at, end_date, membership_plans(name, price)")
+      .select("id, user_id, status, created_at, end_date, quoted_price, membership_plans(name, price)")
       .order("created_at", { ascending: false }),
     supabase
       .from("payments")
@@ -891,12 +827,12 @@ export async function getBillingMemberOptions(
     }
 
     if (latestMembership.status !== "PENDING") {
-      const isAlreadyPaid = latestMembership.status === "ACTIVE";
+      const isAlreadyPaid = effectiveMembershipStatus(latestMembership) === "ACTIVE";
       return {
         id: profile.id,
         name,
         planName: latestPlan?.name ?? "No plan",
-        planPrice: Number(latestPlan?.price ?? 0),
+        planPrice: Number(latestMembership.quoted_price ?? latestPlan?.price ?? 0),
         paymentState: "NO_PENDING_MEMBERSHIP" as const,
         note: isAlreadyPaid ? "Member already paid" : "No pending payment",
       };
@@ -907,7 +843,7 @@ export async function getBillingMemberOptions(
         id: profile.id,
         name,
         planName: latestPlan?.name ?? "No plan",
-        planPrice: Number(latestPlan?.price ?? 0),
+        planPrice: Number(latestMembership.quoted_price ?? latestPlan?.price ?? 0),
         paymentState: "ALREADY_PAID" as const,
         note: "Member already paid",
       };
@@ -917,7 +853,7 @@ export async function getBillingMemberOptions(
       id: profile.id,
       name,
       planName: latestPlan?.name ?? "No plan",
-      planPrice: Number(latestPlan?.price ?? 0),
+      planPrice: Number(latestMembership.quoted_price ?? latestPlan?.price ?? 0),
       paymentState: "PAYABLE" as const,
       note: "Ready to record payment",
     };

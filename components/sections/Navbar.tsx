@@ -5,7 +5,6 @@ import { motion, useScroll, useTransform } from "motion/react";
 
 const navLinks = [
   { label: "Programs", href: "#programs" },
-  { label: "Coaches", href: "#coaches" },
   { label: "Membership", href: "#membership" },
   { label: "Contact", href: "#contact" },
 ];

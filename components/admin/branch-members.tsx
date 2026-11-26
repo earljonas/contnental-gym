@@ -874,7 +874,7 @@ function RegisterWalkInMemberModal({
         referenceNumber: paymentMethod === "GCASH" ? referenceNumber : undefined,
       });
 
-      if (result.error) {
+      if (!("memberId" in result)) {
         setError(result.error);
         return;
       }
@@ -1155,12 +1155,14 @@ function RegisterWalkInMemberModal({
 
 export function BranchMembersPage({
   data,
+  branchName,
   pendingWalkups,
   memberDetails,
   planOptions,
   editMode,
 }: {
   data: BranchMembersData;
+  branchName: string;
   pendingWalkups: PendingMember[];
   memberDetails: MemberDetails | null;
   planOptions: BranchPlanOption[];
@@ -1174,6 +1176,8 @@ export function BranchMembersPage({
   const [planFilter, setPlanFilter] = useState("All");
   const [memberPage, setMemberPage] = useState(1);
   const [checkInFeedback, setCheckInFeedback] = useState<Feedback>(null);
+  const [receipt, setReceipt] = useState("");
+  const activationButton = useRef<HTMLButtonElement | null>(null);
   const [activatingMember, setActivatingMember] = useState<PendingMember | null>(null);
   const [completingMember, setCompletingMember] = useState<MemberRow | null>(null);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
@@ -1229,6 +1233,7 @@ export function BranchMembersPage({
 
   return (
     <AdminPageTransition>
+      {receipt && <p role="status" className="mb-4 rounded-xl border p-3">{receipt}</p>}
       <div className="space-y-8">
         <AdminPageHeader
           title="Members"
@@ -1488,7 +1493,7 @@ export function BranchMembersPage({
                           <Button
                             size="sm"
                             className="h-10 rounded-xl bg-[#C9973E] px-4 text-[10px] font-bold uppercase tracking-wider text-black"
-                            onClick={() => setActivatingMember(member)}
+                            onClick={(event) => { activationButton.current = event.currentTarget; setActivatingMember(member); }}
                           >
                             <UserPlus className="size-4" />
                             Activate
@@ -1513,7 +1518,13 @@ export function BranchMembersPage({
       ) : null}
 
       {activatingMember ? (
-        <ActivateModal member={activatingMember} onClose={() => setActivatingMember(null)} />
+        <ActivateModal member={activatingMember} branchName={branchName} onClose={() => setActivatingMember(null)}
+          onComplete={(receiptId) => {
+            setReceipt(`Receipt #${receiptId} recorded. Membership activated.`);
+            setActivatingMember(null);
+            router.refresh();
+          }}
+          restoreFocus={() => activationButton.current?.focus()} />
       ) : null}
 
       {completingMember ? (

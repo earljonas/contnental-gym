@@ -1,4 +1,5 @@
 import { DashboardPage } from "@/components/admin/dashboard-page";
+import { ReportUnavailable } from "@/components/admin/report-unavailable";
 import { getSuperAdminOverview, type DashboardPeriod } from "@/lib/super-admin/data";
 
 export default async function AdminPage({
@@ -10,6 +11,7 @@ export default async function AdminPage({
   const period: DashboardPeriod =
     params.period === "7d" || params.period === "quarter" ? params.period : "30d";
   const overview = await getSuperAdminOverview(period);
+  if (overview.unavailable) return <ReportUnavailable title="Dashboard unavailable" href={`/admin?period=${period}`} />;
 
   return (
     <DashboardPage
