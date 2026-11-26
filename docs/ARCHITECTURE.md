@@ -12,14 +12,14 @@ flowchart LR
     App["Next.js · Server Components, Actions, route handlers"]
     Auth["Supabase Auth"]
     DB["Supabase Data API · Postgres with RLS"]
-    Ollama["Ollama · optional AI coach"]
+    Coach["Optional coach provider · Ollama, Groq, or OpenAI"]
 
     Browser -->|Pages and actions| App
     Browser -->|Sign-in and signup| Auth
     Browser -->|Initial membership| DB
     App -->|Session validation| Auth
     App -->|Session-scoped data access| DB
-    App -->|Streams chat via the coach endpoint| Ollama
+    App -->|Streams chat via the coach endpoint| Coach
 ```
 
 | Code | Responsibility |
