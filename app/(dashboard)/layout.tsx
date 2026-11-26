@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getUserRole } from "@/lib/supabase/roles";
 import { MemberShell } from "@/components/member/member-shell";
-import { pickCurrentMembership } from "@/lib/member-membership";
+import { effectiveMembershipStatus, pickCurrentMembership } from "@/lib/member-membership";
 
 export default async function DashboardLayout({
   children,
@@ -30,7 +30,7 @@ export default async function DashboardLayout({
 
   const { data: memberships } = await supabase
     .from("memberships")
-    .select("status, created_at, end_date")
+    .select("status, start_date, created_at, end_date")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(10);
@@ -40,7 +40,7 @@ export default async function DashboardLayout({
   return (
     <MemberShell
       userName={profile?.first_name ?? "Member"}
-      membershipStatus={membership?.status ?? null}
+      membershipStatus={effectiveMembershipStatus(membership)}
     >
       {children}
     </MemberShell>

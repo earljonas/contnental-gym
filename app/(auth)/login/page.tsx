@@ -16,6 +16,26 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  async function requestPasswordReset() {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError("Enter your email address first.");
+      return;
+    }
+    setIsLoading(true);
+    setError("");
+    setNotice("");
+    try {
+      const client = createClient();
+      await client.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
+      });
+      setNotice("If this address can receive a reset link, check your inbox.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -136,6 +156,10 @@ export default function LoginPage() {
           )}
         </button>
       </form>
+      <button type="button" onClick={requestPasswordReset} disabled={isLoading} className="mt-4 min-h-11 text-sm underline">
+        Send password reset link
+      </button>
+      {notice && <p role="status" className="mt-2 text-sm text-text-secondary">{notice}</p>}
 
       <div className="my-8 flex items-center gap-4">
         <div className="h-px flex-1 bg-border-subtle" />

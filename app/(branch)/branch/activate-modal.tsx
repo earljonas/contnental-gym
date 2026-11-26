@@ -1,163 +1,82 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { X } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { motion } from "motion/react";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { activateMember } from "./actions";
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { addGymDays, gymDate } from "@/lib/gym/business-date";
+import { formatPlanPrice } from "@/lib/gym/plans";
 import type { PendingMember } from "@/lib/branch-admin/data";
+import { activateMember } from "./actions";
 
-export function ActivateModal({
-  member,
-  onClose,
-}: {
+export function ActivateModal({ member, branchName, onClose, onComplete, restoreFocus }: {
   member: PendingMember;
+  branchName: string;
   onClose: () => void;
+  onComplete: (receiptId: number) => void;
+  restoreFocus: () => void;
 }) {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
-  const [error, setError] = useState("");
+  const [pending, startTransition] = useTransition();
   const [method, setMethod] = useState<"CASH" | "GCASH">("CASH");
-  const [referenceNumber, setReferenceNumber] = useState("");
+  const [reference, setReference] = useState("");
+  const [error, setError] = useState("");
+  const start = gymDate();
+  const end = member.planDuration > 0 ? addGymDays(start, member.planDuration - 1) : "—";
 
-  function handleSubmit() {
+  function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     startTransition(async () => {
       setError("");
-      const result = await activateMember({
-        memberId: member.id,
-        membershipId: member.membershipId,
-        planId: member.planId,
-        amount: member.planPrice,
-        paymentMethod: method,
-        referenceNumber: method === "GCASH" ? referenceNumber.trim() || undefined : undefined,
-      });
-
-      if (result.error) {
-        setError(result.error);
-        return;
+      try {
+        const result = await activateMember({ memberId: member.id, membershipId: member.membershipId,
+          paymentMethod: method, referenceNumber: method === "GCASH" ? reference : undefined });
+        if (result.success) onComplete(result.receiptId);
+        else setError(result.error);
+      } catch {
+        setError("Could not confirm the receipt. Retry before collecting again.");
       }
-
-      onClose();
-      router.refresh();
     });
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="activate-modal-title"
-    >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-lg overflow-hidden rounded-[32px] border border-border bg-card shadow-2xl"
-      >
-        <div className="flex items-center justify-between border-b border-border/50 bg-secondary/30 px-8 py-6">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-              Walkup Activation
-            </p>
-            <h2
-              id="activate-modal-title"
-              className="mt-1 font-display text-2xl font-black uppercase tracking-tight text-foreground"
-            >
-              Activate Member
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isPending}
-            className="flex size-8 items-center justify-center rounded-full bg-background/50 text-muted-foreground hover:bg-foreground hover:text-background transition-colors"
-            aria-label="Close dialog"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
-
-        <div className="p-8 space-y-6">
-          {/* Member info summary */}
-          <div className="rounded-2xl border border-border bg-secondary/20 p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-foreground">{member.name}</span>
-              <span className="text-xs text-muted-foreground">{member.email}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                {member.plan}
-              </span>
-              <span className="text-sm font-bold text-foreground">
-                PHP {member.planPrice.toLocaleString()}
-              </span>
-            </div>
-          </div>
-
-          <div className="space-y-2.5">
-            <Label htmlFor="activate-method" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-              Payment Method
-            </Label>
-            <Select
-              id="activate-method"
-              value={method}
-              onChange={(e) => setMethod(e.target.value as "CASH" | "GCASH")}
-              className="h-12 rounded-2xl bg-secondary/20"
-              disabled={isPending}
-            >
-              <option value="CASH">Cash</option>
-              <option value="GCASH">GCash</option>
+    <Sheet open onOpenChange={(open) => { if (!open && !pending) onClose(); }}>
+      <SheetContent showCloseButton={false} className="w-full overflow-y-auto sm:max-w-lg"
+        onCloseAutoFocus={(event) => { event.preventDefault(); restoreFocus(); }}>
+        <SheetHeader className="border-b px-5 py-5 sm:px-6">
+          <SheetTitle className="text-xl font-semibold">Activate membership</SheetTitle>
+          <SheetDescription>Review the plan and record the payment collected at the desk.</SheetDescription>
+        </SheetHeader>
+        <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col gap-4">
+          <div className="space-y-4 px-5 sm:px-6">
+            <dl className="space-y-3 rounded-xl border bg-muted/30 p-4">
+              <div><dt className="text-xs text-muted-foreground">Member</dt><dd className="break-words font-medium">{member.name}</dd><dd className="break-all text-xs">{member.email}</dd></div>
+              <div><dt className="text-xs text-muted-foreground">Plan</dt><dd>{member.plan}</dd></div>
+              <div><dt className="text-xs text-muted-foreground">Access dates in Davao</dt><dd className="tabular-nums">{start} through {end}</dd></div>
+              <div><dt className="text-xs text-muted-foreground">Collection branch</dt><dd>{branchName}</dd></div>
+              <div><dt className="text-xs text-muted-foreground">Amount due</dt><dd className="text-xl font-semibold tabular-nums">{formatPlanPrice(member.planPrice)}</dd></div>
+            </dl>
+            <Label htmlFor="activate-method">Payment method</Label>
+            <Select autoFocus id="activate-method" value={method} className="h-11" disabled={pending}
+              onChange={(event) => setMethod(event.target.value as "CASH" | "GCASH")}>
+              <option value="CASH">Cash</option><option value="GCASH">GCash</option>
             </Select>
+            {method === "GCASH" && <div className="space-y-2">
+              <Label htmlFor="activate-ref">GCash reference</Label>
+              <Input id="activate-ref" className="h-11" required maxLength={80} disabled={pending} value={reference}
+                onChange={(event) => setReference(event.target.value)} />
+            </div>}
+            {error && <p role="alert" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
           </div>
-
-          {method === "GCASH" ? (
-            <div className="space-y-2.5">
-              <Label htmlFor="activate-ref" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                Reference Number
-              </Label>
-              <Input
-                id="activate-ref"
-                value={referenceNumber}
-                onChange={(e) => setReferenceNumber(e.target.value)}
-                placeholder="e.g. 1234567890"
-                className="h-12 rounded-2xl bg-secondary/20"
-                disabled={isPending}
-              />
-            </div>
-          ) : null}
-
-          {error ? (
-            <p className="text-sm font-medium text-destructive bg-destructive/10 px-4 py-3 rounded-xl">
-              {error}
-            </p>
-          ) : null}
-
-          <div className="mt-8 flex items-center justify-end gap-3 pt-4 border-t border-border/50">
-            <Button
-              type="button"
-              variant="ghost"
-              className="h-12 rounded-2xl px-6 text-xs font-bold uppercase tracking-[0.16em] hover:bg-secondary/50"
-              onClick={onClose}
-              disabled={isPending}
-            >
-              Cancel
+          <SheetFooter className="sticky bottom-0 grid gap-2 border-t bg-popover sm:grid-cols-[1fr_2fr]">
+            <Button type="button" variant="outline" onClick={onClose} disabled={pending} className="min-h-11">Cancel</Button>
+            <Button type="submit" disabled={pending || member.planDuration < 1 || (method === "GCASH" && !reference.trim())} className="min-h-11">
+              {pending ? "Recording payment…" : "Record payment and activate"}
             </Button>
-            <Button
-              type="button"
-              className="h-12 rounded-2xl px-8 text-xs font-bold uppercase tracking-[0.16em]"
-              onClick={handleSubmit}
-              disabled={isPending}
-            >
-              {isPending ? "Activating..." : "Confirm & Activate"}
-            </Button>
-          </div>
-        </div>
-      </motion.div>
-    </div>
+          </SheetFooter>
+        </form>
+      </SheetContent>
+    </Sheet>
   );
 }

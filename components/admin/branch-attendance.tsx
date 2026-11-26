@@ -37,7 +37,7 @@ import type {
   MemberLookup,
   SearchableMember,
 } from "@/lib/branch-admin/data";
-import { checkInMember } from "@/app/(branch)/branch/attendance/actions";
+import { checkInMember, searchCheckInMembers } from "@/app/(branch)/branch/attendance/actions";
 
 // ── Status feedback config ──
 
@@ -46,8 +46,6 @@ type FeedbackState = {
   member?: MemberLookup;
   message: string;
 };
-
-const SCANNER_STORAGE_KEY = "continental-branch-scanner-enabled";
 
 const feedbackConfig = {
   success: {
@@ -202,104 +200,69 @@ function QrScanner({ onScan, enabled }: { onScan: (code: string) => void; enable
 
 // ── Manual Check-in Component ──
 
-function ManualCheckIn({
-  members,
-  onCheckIn,
-  isPending,
-}: {
-  members: SearchableMember[];
+function ManualCheckIn({ onCheckIn, isPending }: {
   onCheckIn: (memberId: string) => void;
   isPending: boolean;
 }) {
   const [search, setSearch] = useState("");
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [selectedMember, setSelectedMember] = useState<SearchableMember | null>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [selection, setSelection] = useState<SearchableMember | null>(null);
+  const [results, setResults] = useState<SearchableMember[]>([]);
+  const [status, setStatus] = useState("");
+  const query = search.trim();
 
-  const filteredMembers = search.trim().length > 0
-    ? members.filter((m) =>
-        m.name.toLowerCase().includes(search.toLowerCase())
-      ).slice(0, 8)
-    : [];
-
-  // Close dropdown on outside click
   useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setIsDropdownOpen(false);
+    if (query.length < 2 || selection) return;
+    let current = true;
+    const timer = window.setTimeout(async () => {
+      try {
+        const result = await searchCheckInMembers(query);
+        if (!current) return;
+        setResults(result.members);
+        setStatus(result.error ?? (result.members.length ? "" : "No matching members."));
+      } catch {
+        if (current) setStatus("Search is unavailable. Try again.");
       }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
-  function handleSelect(member: SearchableMember) {
-    setSelectedMember(member);
-    setSearch(member.name);
-    setIsDropdownOpen(false);
-  }
-
-  function handleSubmit() {
-    if (!selectedMember) return;
-    onCheckIn(selectedMember.id);
-    setSearch("");
-    setSelectedMember(null);
-  }
+    }, 250);
+    return () => { current = false; window.clearTimeout(timer); };
+  }, [query, selection]);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2 text-muted-foreground">
-        <Search className="size-4" />
-        <span className="text-[11px] font-semibold uppercase tracking-[0.16em]">
-          Manual Check-in
-        </span>
-      </div>
-      <div className="flex gap-3" ref={dropdownRef}>
-        <div className="relative flex-1">
-          <Input
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setSelectedMember(null);
-              setIsDropdownOpen(e.target.value.trim().length > 0);
-            }}
-            onFocus={() => {
-              if (search.trim().length > 0) setIsDropdownOpen(true);
-            }}
-            placeholder="Search member name..."
-            className="h-12 rounded-2xl bg-secondary/20 pl-4 text-sm"
-            disabled={isPending}
-          />
-          {isDropdownOpen && filteredMembers.length > 0 && (
-            <div className="absolute top-full left-0 right-0 z-20 mt-2 max-h-56 overflow-y-auto rounded-2xl border border-border bg-card shadow-xl">
-              {filteredMembers.map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  className="w-full px-4 py-3 text-left text-sm font-medium text-foreground transition-colors hover:bg-secondary/50 first:rounded-t-2xl last:rounded-b-2xl"
-                  onClick={() => handleSelect(m)}
-                >
-                  {m.name}
-                </button>
-              ))}
-            </div>
-          )}
-          {isDropdownOpen && filteredMembers.length === 0 && search.trim().length > 0 && (
-            <div className="absolute top-full left-0 right-0 z-20 mt-2 rounded-2xl border border-border bg-card px-4 py-6 text-center text-sm text-muted-foreground shadow-xl">
-              No members found
-            </div>
-          )}
-        </div>
-        <Button
-          onClick={handleSubmit}
-          disabled={!selectedMember || isPending}
-          className="h-12 shrink-0 rounded-2xl px-6 text-xs font-bold uppercase tracking-[0.16em]"
-        >
-          <UserCheck className="mr-2 size-4" />
-          {isPending ? "Checking in..." : "Check In"}
+    <form className="space-y-3" onSubmit={(event) => {
+      event.preventDefault();
+      if (selection && !isPending) onCheckIn(selection.id);
+    }}>
+      <label htmlFor="checkin-member" className="flex items-center gap-2 text-sm font-semibold">
+        <Search className="size-4" /> Find a member
+      </label>
+      <div className="flex flex-wrap gap-2">
+        <Input id="checkin-member" value={search} maxLength={80} autoComplete="off" aria-describedby="member-search-status"
+          onChange={(event) => {
+            setSearch(event.target.value);
+            setSelection(null);
+            setResults([]);
+            setStatus(event.target.value.trim().length >= 2 ? "Searching…" : "");
+          }}
+          placeholder="Member name" className="min-h-12 min-w-0 flex-1" disabled={isPending} />
+        <Button type="submit" disabled={!selection || isPending} className="min-h-12">
+          <UserCheck className="size-4" /> {isPending ? "Checking in…" : "Check in"}
         </Button>
       </div>
-    </div>
+      <p id="member-search-status" role="status" className="text-sm text-muted-foreground">
+        {query.length < 2 ? "Enter at least two characters." : selection ? `${selection.name} selected` : status}
+      </p>
+      {!selection && results.length > 0 && (
+        <ul aria-label="Matching members" className="max-h-52 overflow-auto rounded-lg border">
+          {results.map((member) => (
+            <li key={member.id}>
+              <button type="button" onClick={() => setSelection(member)}
+                className="min-h-11 w-full border-b px-3 text-left text-sm hover:bg-muted focus-visible:bg-muted">
+                {member.name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </form>
   );
 }
 
@@ -307,21 +270,15 @@ function ManualCheckIn({
 
 export function BranchAttendancePage({
   data,
-  members,
   dateFilter,
 }: {
   data: BranchAttendanceData;
-  members: SearchableMember[];
   dateFilter?: string;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<FeedbackState>({ type: null, message: "" });
-  const [scannerEnabled, setScannerEnabled] = useState(() => {
-    if (typeof window === "undefined") return true;
-    const saved = window.localStorage.getItem(SCANNER_STORAGE_KEY);
-    return saved === null ? true : saved === "true";
-  });
+  const [scannerEnabled, setScannerEnabled] = useState(false);
   const lastScannedRef = useRef<string>("");
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -411,11 +368,9 @@ export function BranchAttendancePage({
   const currentFeedbackConfig = feedback.type ? feedbackConfig[feedback.type] : null;
 
   function toggleScanner() {
-    setScannerEnabled((enabled) => {
-      const next = !enabled;
-      window.localStorage.setItem(SCANNER_STORAGE_KEY, String(next));
-      return next;
-    });
+    lastScannedRef.current = "";
+    setFeedback({ type: null, message: "" });
+    setScannerEnabled((enabled) => !enabled);
   }
 
   return (
@@ -426,7 +381,7 @@ export function BranchAttendancePage({
         {/* ── TOP HALF: Check-in Station ── */}
         <Card className="overflow-hidden rounded-[30px]">
           <CardHeader className="border-b border-border/70 p-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="flex size-10 items-center justify-center rounded-2xl bg-secondary">
                   <ScanLine className="size-5 text-foreground" />
@@ -442,26 +397,26 @@ export function BranchAttendancePage({
                 variant="outline"
                 size="sm"
                 onClick={toggleScanner}
-                className="h-9 rounded-full px-4 text-[11px] font-semibold uppercase tracking-[0.12em]"
+                className="min-h-11 px-4 text-sm font-medium"
               >
                 {scannerEnabled ? (
                   <>
                     <CameraOff className="mr-1.5 size-3.5" />
-                    Disable Camera
+                    Close scanner
                   </>
                 ) : (
                   <>
                     <Camera className="mr-1.5 size-3.5" />
-                    Enable Camera
+                    Scan QR code
                   </>
                 )}
               </Button>
             </div>
           </CardHeader>
           <CardContent className="p-6">
-            <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
+            <div className="grid gap-4 lg:grid-cols-2">
               {/* Scanner / Feedback column */}
-              <div className="space-y-5">
+              <div className="order-2 space-y-3">
                 {scannerEnabled && !feedback.type && (
                   <QrScanner onScan={handleQrScan} enabled={scannerEnabled} />
                 )}
@@ -474,10 +429,11 @@ export function BranchAttendancePage({
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.95 }}
-                      className={`relative rounded-2xl border ${currentFeedbackConfig.border} ${currentFeedbackConfig.bg} p-6`}
+                      role="status" aria-live="polite"
+                      className={`relative rounded-xl border ${currentFeedbackConfig.border} ${currentFeedbackConfig.bg} p-6`}
                     >
                       <button
-                        type="button"
+                        type="button" aria-label="Dismiss check-in result"
                         className="absolute right-3 top-3 rounded-full p-1 text-muted-foreground hover:text-foreground"
                         onClick={() => setFeedback({ type: null, message: "" })}
                       >
@@ -495,13 +451,6 @@ export function BranchAttendancePage({
 
                         {feedback.member && (
                           <div className="space-y-1">
-                            {feedback.member.avatarUrl && (
-                              <img
-                                src={feedback.member.avatarUrl}
-                                alt=""
-                                className="mx-auto mb-3 size-16 rounded-full border-2 border-border object-cover"
-                              />
-                            )}
                             <p className="text-lg font-bold text-foreground">
                               {feedback.member.name}
                             </p>
@@ -517,6 +466,13 @@ export function BranchAttendancePage({
                             >
                               {feedback.member.membershipStatus}
                             </Badge>
+                            {feedback.member.lastVisitAt && (
+                              <p className="text-xs text-muted-foreground">
+                                {feedback.member.lastVisitBranch} · {new Date(feedback.member.lastVisitAt).toLocaleString("en-PH", {
+                                  timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short",
+                                })}
+                              </p>
+                            )}
                           </div>
                         )}
 
@@ -530,20 +486,11 @@ export function BranchAttendancePage({
                   )}
                 </AnimatePresence>
 
-                {!scannerEnabled && !feedback.type && (
-                  <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-border bg-secondary/20 p-12 text-center">
-                    <CameraOff className="size-10 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">
-                      Camera disabled. Use manual check-in.
-                    </p>
-                  </div>
-                )}
               </div>
 
               {/* Manual check-in column */}
-              <div className="flex flex-col justify-between gap-6">
+              <div className="order-1 flex min-w-0 flex-col gap-4">
                 <ManualCheckIn
-                  members={members}
                   onCheckIn={(id) => handleCheckIn(id, "Manual")}
                   isPending={isPending}
                 />

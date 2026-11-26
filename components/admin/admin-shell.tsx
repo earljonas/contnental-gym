@@ -47,7 +47,7 @@ export function AdminShell({
   return (
     <div
       className={cn(
-        "min-h-screen bg-background text-foreground transition-colors duration-300",
+        "portal-type min-h-screen bg-background text-foreground transition-colors duration-300",
         isLightMode && "light"
       )}
     >

@@ -101,7 +101,6 @@ function RecordPaymentModal({
       setError("");
       const result = await recordBranchPayment({
         userId: selectedMember.id,
-        amount: numAmount,
         method,
         referenceNumber: method === "GCASH" ? referenceNumber.trim() || undefined : undefined,
       });
@@ -206,7 +205,7 @@ function RecordPaymentModal({
               min="0"
               step="0.01"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              readOnly
               placeholder="0.00"
               className="h-11 rounded-xl bg-secondary/20 focus:border-[#C9973E] focus:ring-[#C9973E]/20"
               disabled={isPending}

@@ -12,6 +12,7 @@ export default function AuthLayout({
       <div className="relative hidden w-1/2 lg:block">
         <Image
           src="/gym1.jpg"
+          sizes="(min-width: 1024px) 50vw, 1px"
           alt="Contnental Fitness Gym interior"
           fill
           className="object-cover"

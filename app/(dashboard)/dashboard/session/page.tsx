@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ActiveSession } from "@/components/member/active-session";
 
@@ -11,6 +12,8 @@ export default async function SessionPage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
 
   let routineName: string | null = null;
   let routineId: number | null = null;
@@ -31,10 +34,11 @@ export default async function SessionPage({
         "name, routine_exercises(exercise_id, exercise_name, target_muscle, default_sets, default_reps, default_weight, sort_order)",
       )
       .eq("id", routineId)
-      .eq("user_id", user!.id)
+      .eq("user_id", user.id)
       .single();
 
-    if (routine) {
+    if (!routine) redirect("/dashboard/workouts");
+    {
       routineName = routine.name;
       exercises = (routine.routine_exercises ?? [])
         .sort((a: { sort_order: number }, b: { sort_order: number }) => a.sort_order - b.sort_order)
@@ -62,6 +66,7 @@ export default async function SessionPage({
 
   return (
     <ActiveSession
+      memberId={user.id}
       routineId={routineId}
       routineName={routineName}
       initialExercises={exercises}

@@ -3,12 +3,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Check, ChevronRight, Minus, Plus,
-  Square, Timer, Trophy, Volume2, X, Dumbbell,
+  ArrowLeft, ChevronRight, Minus, Plus,
+  Timer, Volume2, Dumbbell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Input } from "@/components/ui/input";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { saveSession } from "@/app/(dashboard)/dashboard/session/actions";
 import { StickerStats } from "@/components/member/sticker-stats";
 
@@ -35,6 +34,7 @@ interface ExerciseState {
 }
 
 interface ActiveSessionProps {
+  memberId: string;
   routineId: number | null;
   routineName: string | null;
   initialExercises: SessionExercise[];
@@ -128,11 +128,14 @@ function RestTimerOverlay({
 }
 
 /* ─── Main Component ─── */
-export function ActiveSession({ routineId, routineName, initialExercises }: ActiveSessionProps) {
+export function ActiveSession({ memberId, routineId, routineName, initialExercises }: ActiveSessionProps) {
   const router = useRouter();
   const startTimeRef = useRef(new Date());
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const finalElapsedRef = useRef<number | null>(null);
+  const sessionIdRef = useRef("");
+  const savingRef = useRef(false);
+  const draftKey = `continental-workout:${memberId}:${routineId ?? initialExercises[0]?.exercise_id ?? "quick"}`;
 
   const [elapsed, setElapsed] = useState(0);
   const [currentIdx, setCurrentIdx] = useState(0);
@@ -154,6 +157,54 @@ export function ActiveSession({ routineId, routineName, initialExercises }: Acti
   const [showSticker, setShowSticker] = useState(false);
   const [saving, setSaving] = useState(false);
   const [exerciseDetail, setExerciseDetail] = useState(false);
+  const [draftReady, setDraftReady] = useState(false);
+  const [draftStored, setDraftStored] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [restEnabled, setRestEnabled] = useState(true);
+
+  useEffect(() => {
+    let current = true;
+    queueMicrotask(() => {
+      if (!current) return;
+      sessionIdRef.current = crypto.randomUUID();
+      try {
+        const stored = window.localStorage.getItem(draftKey);
+        if (stored) {
+          const draft = JSON.parse(stored) as { sessionId: string; startedAt: number; currentIdx: number; exercises: ExerciseState[] };
+          if (draft.sessionId && Number.isFinite(draft.startedAt) && Date.now() - draft.startedAt < 86_400_000
+            && draft.exercises?.length && Number.isInteger(draft.currentIdx) && draft.currentIdx >= 0
+            && draft.currentIdx < draft.exercises.length) {
+            sessionIdRef.current = draft.sessionId;
+            startTimeRef.current = new Date(draft.startedAt);
+            setExercises(draft.exercises);
+            setCurrentIdx(draft.currentIdx);
+          }
+        }
+        setDraftStored(true);
+      } catch {
+        setDraftStored(false);
+      }
+      setDraftReady(true);
+    });
+    return () => { current = false; };
+  }, [draftKey]);
+
+  useEffect(() => {
+    if (!draftReady || showSticker) return;
+    let current = true;
+    queueMicrotask(() => {
+      if (!current) return;
+      try {
+        window.localStorage.setItem(draftKey, JSON.stringify({
+          sessionId: sessionIdRef.current, startedAt: startTimeRef.current.getTime(), currentIdx, exercises,
+        }));
+        setDraftStored(true);
+      } catch {
+        setDraftStored(false);
+      }
+    });
+    return () => { current = false; };
+  }, [draftKey, draftReady, currentIdx, exercises, showSticker]);
 
   // Stopwatch – stop when session is finished
   useEffect(() => {
@@ -190,7 +241,7 @@ export function ActiveSession({ routineId, routineName, initialExercises }: Acti
         ? { ...ex, sets: ex.sets.map((s, si) => (si === setIdx ? { ...s, done: true } : s)) }
         : ex,
     ));
-    setShowRest(true);
+    if (restEnabled) setShowRest(true);
   }
 
   function addSet() {
@@ -217,38 +268,42 @@ export function ActiveSession({ routineId, routineName, initialExercises }: Acti
   }
 
   function handleBack() {
-    if (confirm("Leave session? Progress will be lost.")) router.push("/dashboard");
+    if (draftStored || confirm("Leave this workout without a saved draft?")) router.push("/dashboard/workouts");
   }
 
   // Save
   const handleSave = useCallback(async () => {
+    if (!draftReady || savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
+    setSaveError("");
     const endTime = new Date();
     try {
       await saveSession({
+        sessionId: sessionIdRef.current,
         routine_id: routineId,
         routine_name: routineName,
         started_at: startTimeRef.current.toISOString(),
         ended_at: endTime.toISOString(),
-        total_volume: totalVolume,
         exercises: exercises.map((ex) => ({
           name: ex.name,
           sets: ex.sets.filter((s) => s.done).map((s) => ({ weight: s.weight, reps: s.reps })),
         })),
         notes: null,
       });
+      try { window.localStorage.removeItem(draftKey); } catch { /* The session is already saved. */ }
       setShowSummary(false);
       setShowSticker(true);
-    } catch (err) {
-      console.error(err);
+    } catch {
+      setSaveError("Could not save the workout. Your sets are still here. Try again.");
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
-  }, [exercises, routineId, routineName, totalVolume]);
+  }, [draftKey, draftReady, exercises, routineId, routineName]);
 
   const completedExCount = exercises.filter((e) => e.sets.some((s) => s.done)).length;
   const displayElapsed = finalElapsedRef.current ?? elapsed;
-  const durationMin = Math.floor(displayElapsed / 60);
 
   // Stable callback for rest timer dismiss
   const dismissRest = useCallback(() => setShowRest(false), []);
@@ -274,7 +329,7 @@ export function ActiveSession({ routineId, routineName, initialExercises }: Acti
     <div className="relative min-h-screen">
       {/* Header Bar */}
       <div className="sticky top-0 z-40 flex items-center justify-between border-b border-border bg-background/95 px-4 py-3 backdrop-blur-sm">
-        <button onClick={handleBack} className="rounded-lg p-2 text-muted-foreground hover:text-foreground">
+        <button onClick={handleBack} aria-label="Back to workouts" className="min-h-11 min-w-11 rounded-lg p-2 text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-5" />
         </button>
         <div className="flex items-center gap-4 text-[11px] font-medium text-muted-foreground">
@@ -284,8 +339,8 @@ export function ActiveSession({ routineId, routineName, initialExercises }: Acti
           </span>
           <span>{currentIdx + 1} / {exercises.length}</span>
         </div>
-        <button onClick={handleFinish}
-          className="rounded-xl bg-[#C9973E] px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-black">
+        <button onClick={handleFinish} disabled={!completedExCount || !draftReady}
+          className="min-h-11 rounded-xl disabled:opacity-50 bg-[#C9973E] px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-black">
           Finish
         </button>
       </div>
@@ -297,8 +352,9 @@ export function ActiveSession({ routineId, routineName, initialExercises }: Acti
             {formatTime(displayElapsed)}
           </p>
           <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-            Session Time
+            Session time
           </p>
+          <p className="mt-1 text-xs text-muted-foreground" role="status">{draftReady && (draftStored ? "Draft saved on this device" : "Draft storage unavailable")}</p>
         </div>
 
         {/* Current Exercise */}
@@ -313,7 +369,7 @@ export function ActiveSession({ routineId, routineName, initialExercises }: Acti
 
         {/* Set Tracker */}
         <div className="rounded-2xl border border-border bg-card">
-          <div className="grid grid-cols-4 border-b border-border px-4 py-2.5">
+          <div className="grid grid-cols-[.55fr_1fr_1fr_1.2fr] border-b border-border px-2 py-2.5">
             {["Set", "KG", "Reps", ""].map((h) => (
               <span key={h} className="text-center text-[10px] font-medium uppercase tracking-[0.15em] text-muted-foreground">
                 {h}
@@ -322,57 +378,57 @@ export function ActiveSession({ routineId, routineName, initialExercises }: Acti
           </div>
           {current.sets.map((set, i) => (
             <div key={i}
-              className={cn("grid grid-cols-4 items-center border-b border-border px-4 py-3 last:border-b-0",
+              className={cn("grid grid-cols-[.55fr_1fr_1fr_1.2fr] items-center gap-1 border-b border-border px-2 py-2 last:border-b-0",
                 set.done && "bg-emerald-500/5")}>
               <span className={cn("text-center text-[13px] font-medium",
                 set.done ? "text-emerald-500 line-through" : "text-foreground")}>
                 {i + 1}
               </span>
               <div className="flex justify-center">
-                <input type="number" value={set.weight || ""}
+                <input type="number" inputMode="decimal" min="0" max="2000" step="0.01" aria-label={`Set ${i + 1} weight in kilograms`} value={set.weight || ""}
                   placeholder="0"
                   onChange={(e) => updateSet(i, "weight", parseFloat(e.target.value) || 0)}
                   onFocus={(e) => e.target.select()}
                   disabled={set.done}
-                  className={cn("h-8 w-16 rounded-lg border border-input bg-transparent text-center text-[13px]",
+                  className={cn("h-11 w-full max-w-16 rounded-lg border border-input bg-transparent text-center text-[13px]",
                     set.done && "line-through opacity-50")} />
               </div>
               <div className="flex justify-center">
-                <input type="number" value={set.reps || ""}
+                <input type="number" inputMode="numeric" min="1" max="500" aria-label={`Set ${i + 1} repetitions`} value={set.reps || ""}
                   placeholder="0"
                   onChange={(e) => updateSet(i, "reps", parseInt(e.target.value) || 0)}
                   onFocus={(e) => e.target.select()}
                   disabled={set.done}
-                  className={cn("h-8 w-16 rounded-lg border border-input bg-transparent text-center text-[13px]",
+                  className={cn("h-11 w-full max-w-16 rounded-lg border border-input bg-transparent text-center text-[13px]",
                     set.done && "line-through opacity-50")} />
               </div>
               <div className="flex justify-center">
                 {set.done ? (
-                  <Check className="size-5 text-emerald-500" />
+                  <span className="text-xs text-emerald-500">Logged</span>
                 ) : (
-                  <button onClick={() => completeSet(i)}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-border transition-colors hover:border-emerald-500 hover:text-emerald-500">
-                    <Check className="size-4" />
+                  <button onClick={() => completeSet(i)} aria-label={`Log set ${i + 1}`} disabled={!draftReady || set.reps < 1 || set.reps > 500 || set.weight < 0 || set.weight > 2000}
+                    className="min-h-11 rounded-lg border border-border px-2 text-xs disabled:opacity-50 hover:border-emerald-500">
+                    Log set
                   </button>
                 )}
               </div>
             </div>
           ))}
-          <button onClick={addSet}
+          <button onClick={addSet} disabled={!draftReady || current.sets.length >= 30}
             className="flex w-full items-center justify-center gap-1.5 border-t border-border py-3 text-[12px] font-medium text-muted-foreground transition-colors hover:text-foreground">
             <Plus className="size-3.5" /> Add Set
           </button>
         </div>
 
-        {/* Next Exercise */}
-        <button onClick={nextExercise}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-card px-5 py-4 text-[12px] font-semibold uppercase tracking-wider text-foreground transition-all hover:bg-muted active:scale-[0.98]">
-          {currentIdx < exercises.length - 1 ? (
-            <><ChevronRight className="size-4" /> Next Exercise</>
-          ) : (
-            <><Square className="size-4" /> Finish Workout</>
-          )}
-        </button>
+        <label className="flex min-h-11 items-center gap-2 text-sm">
+          <input type="checkbox" checked={restEnabled} onChange={(event) => setRestEnabled(event.target.checked)} />
+          Start a rest timer after logging a set
+        </label>
+        {currentIdx < exercises.length - 1 && (
+          <button onClick={nextExercise} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border">
+            <ChevronRight className="size-4" /> Next exercise
+          </button>
+        )}
       </div>
 
       {/* Rest Timer */}
@@ -385,6 +441,7 @@ export function ActiveSession({ routineId, routineName, initialExercises }: Acti
             <SheetTitle className="font-display text-lg font-black uppercase tracking-tight">
               {current.name}
             </SheetTitle>
+            <SheetDescription>Exercise details and logged sets.</SheetDescription>
           </SheetHeader>
           <div className="space-y-3 px-4 pb-6">
             {current.target && (
@@ -406,6 +463,7 @@ export function ActiveSession({ routineId, routineName, initialExercises }: Acti
             <SheetTitle className="font-display text-lg font-black uppercase tracking-tight">
               Session Complete
             </SheetTitle>
+            <SheetDescription>Review your logged sets before saving.</SheetDescription>
           </SheetHeader>
           <div className="space-y-5 px-4 pb-6">
             <div className="grid grid-cols-3 gap-3">
@@ -433,9 +491,10 @@ export function ActiveSession({ routineId, routineName, initialExercises }: Acti
                 </div>
               ))}
             </div>
-            <button onClick={handleSave} disabled={saving}
+            {saveError && <p role="alert" className="text-sm text-destructive">{saveError}</p>}
+            <button onClick={handleSave} disabled={saving || !draftReady}
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#C9973E] px-5 py-3.5 text-[12px] font-semibold uppercase tracking-wider text-black transition-all hover:bg-[#B8882F] active:scale-[0.98] disabled:opacity-50">
-              {saving ? "Saving..." : "Save Session"}
+              {saving ? "Saving…" : saveError ? "Retry save" : "Save session"}
             </button>
           </div>
         </SheetContent>

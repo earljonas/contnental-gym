@@ -13,27 +13,9 @@ interface Message {
   content: string;
 }
 
-interface CoachContext {
-  firstName: string;
-  membershipStatus: string | null;
-  planName: string | null;
-  daysLeft: number | null;
-  streak: number;
-  sessionsThisWeek: number;
-  weeklyGoal: number;
-  recentSessions: {
-    date: string;
-    routineName: string | null;
-    totalVolume: number;
-    durationMin: number;
-    exercises: { name: string; sets: { weight: number; reps: number }[] }[];
-  }[];
-}
-
 interface CoachChatProps {
   open: boolean;
   onClose: () => void;
-  context: CoachContext;
 }
 
 const SUGGESTIONS = [
@@ -57,13 +39,17 @@ function renderContent(text: string) {
   });
 }
 
-export function CoachChat({ open, onClose, context }: CoachChatProps) {
+export function CoachChat({ open, onClose }: CoachChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const [includeWorkout, setIncludeWorkout] = useState(false);
+
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -79,11 +65,13 @@ export function CoachChat({ open, onClose, context }: CoachChatProps) {
 
   const sendMessage = useCallback(
     async (content: string) => {
-      if (!content.trim() || isStreaming) return;
+      if (!content.trim() || abortRef.current) return;
+      const controller = new AbortController();
+      abortRef.current = controller;
 
       setError(null);
       const userMsg: Message = {
-        id: Date.now().toString(),
+        id: crypto.randomUUID(),
         role: "user",
         content: content.trim(),
       };
@@ -93,7 +81,7 @@ export function CoachChat({ open, onClose, context }: CoachChatProps) {
       setInput("");
       setIsStreaming(true);
 
-      const assistantId = (Date.now() + 1).toString();
+      const assistantId = crypto.randomUUID();
       setMessages((prev) => [
         ...prev,
         { id: assistantId, role: "assistant", content: "" },
@@ -103,12 +91,13 @@ export function CoachChat({ open, onClose, context }: CoachChatProps) {
         const res = await fetch("/api/coach", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
           body: JSON.stringify({
-            messages: newMessages.map((m) => ({
+            messages: newMessages.filter((entry) => entry.content && !entry.content.endsWith(" [Reply interrupted]")).slice(-6).map((m) => ({
               role: m.role,
               content: m.content,
             })),
-            context,
+            includeWorkout,
           }),
         });
 
@@ -124,6 +113,7 @@ export function CoachChat({ open, onClose, context }: CoachChatProps) {
 
         const decoder = new TextDecoder();
         let buffer = "";
+        let completed = false;
 
         while (true) {
           const { value, done } = await reader.read();
@@ -137,8 +127,10 @@ export function CoachChat({ open, onClose, context }: CoachChatProps) {
             const dataLine = line.replace(/^data: /, "");
             if (!dataLine) continue;
 
-            try {
+            {
               const parsed = JSON.parse(dataLine);
+              if (typeof parsed.error === "string") throw new Error(parsed.error);
+              if (parsed.done === true) completed = true;
               if (parsed.token) {
                 setMessages((prev) =>
                   prev.map((m) =>
@@ -148,21 +140,24 @@ export function CoachChat({ open, onClose, context }: CoachChatProps) {
                   )
                 );
               }
-            } catch {
-              // skip
             }
           }
         }
+        if (!completed) throw new Error("The reply was interrupted. Try sending your question again.");
       } catch (err) {
         const errMsg =
           err instanceof Error ? err.message : "Something went wrong";
-        setError(errMsg);
-        setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+        if (!controller.signal.aborted) setError(errMsg);
+        setInput(content);
+        setMessages((previous) => previous.flatMap((message) => message.id === assistantId && message.content
+          ? [{ ...message, content: message.content + " [Reply interrupted]" }]
+          : message.id === assistantId || message.id === userMsg.id ? [] : [message]));
       } finally {
+        abortRef.current = null;
         setIsStreaming(false);
       }
     },
-    [messages, isStreaming, context]
+    [messages, includeWorkout]
   );
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -220,7 +215,7 @@ export function CoachChat({ open, onClose, context }: CoachChatProps) {
                   <Sparkles className="size-8 text-[#C9973E]" />
                 </div>
                 <p className="font-display text-lg font-black uppercase tracking-tight text-foreground">
-                  Hey {context.firstName}
+                  Ask about your training
                 </p>
                 <p className="mt-1 max-w-[280px] text-[13px] text-muted-foreground">
                   I know your workout history. Ask me anything about training,
@@ -276,7 +271,7 @@ export function CoachChat({ open, onClose, context }: CoachChatProps) {
             ))}
 
             {error && (
-              <div className="flex items-start gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3">
+              <div role="alert" className="flex items-start gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3">
                 <AlertCircle className="mt-0.5 size-4 shrink-0 text-red-500" />
                 <div>
                   <p className="text-[13px] font-medium text-red-500">
@@ -289,17 +284,22 @@ export function CoachChat({ open, onClose, context }: CoachChatProps) {
           </div>
 
           <div className="border-t border-border px-4 py-3">
+            <label className="mb-2 flex min-h-11 items-center gap-2 text-xs text-muted-foreground">
+              <input type="checkbox" checked={includeWorkout} onChange={(event) => setIncludeWorkout(event.target.checked)} disabled={isStreaming} />
+              Include recent sets from my workout log
+            </label>
+            <p className="mb-2 text-xs text-muted-foreground">For general fitness guidance. Keep personal and payment details out of chat.</p>
             <form onSubmit={handleSubmit} className="flex items-center gap-2">
               <Input
                 ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask your coach..."
+                aria-label="Your question" maxLength={1200} placeholder="Ask your coach…"
                 disabled={isStreaming}
                 className="h-11 flex-1 rounded-xl focus:border-[#C9973E] focus:ring-[#C9973E]/20"
               />
               <Button
-                type="submit"
+                type="submit" aria-label="Send question"
                 disabled={!input.trim() || isStreaming}
                 className="h-11 w-11 shrink-0 rounded-xl bg-[#C9973E] p-0 text-black transition-all hover:bg-[#B8882F] disabled:opacity-40"
               >

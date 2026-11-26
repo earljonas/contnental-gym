@@ -27,29 +27,11 @@ export async function toggleMemberStatus(memberId: string, currentStatus: string
     const auth = await requireSuperAdmin(supabase);
     if (auth.error) return { error: auth.error };
 
-    const targetStatus = currentStatus === "Active" || currentStatus === "ACTIVE" ? "CANCELLED" : "ACTIVE";
-
-    const { data: membership } = await supabase
-      .from("memberships")
-      .select("id")
-      .eq("user_id", memberId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (!membership) {
-      return { error: "Membership not found" };
-    }
-
-    const { error } = await supabase
-      .from("memberships")
-      .update({ status: targetStatus })
-      .eq("id", membership.id);
-
-    if (error) {
-      console.error("[toggleMemberStatus] Error:", error);
-      return { error: "Failed to toggle status" };
-    }
+    const { data, error } = await supabase.rpc("set_member_suspended", {
+      target_member: memberId,
+      suspend: currentStatus.toUpperCase() === "ACTIVE",
+    });
+    if (error || !data) return { error: "Only a paid, unexpired membership can change access status." };
 
     revalidatePath("/admin/members");
     return { success: true };

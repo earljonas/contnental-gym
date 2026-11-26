@@ -12,6 +12,7 @@
 
 # testing
 /coverage
+/supabase/.temp/
 
 # next.js
 /.next/
@@ -46,4 +47,5 @@ DESIGN.md
 /docs/*
 !/docs/GETTING_STARTED.md
 !/docs/ARCHITECTURE.md
+!/docs/PILOT_RUNBOOK.md
 

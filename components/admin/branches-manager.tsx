@@ -21,7 +21,7 @@ export type BranchCard = {
 };
 
 type EditState = {
-  id: number;
+  id: number | null;
   name: string;
   location: string;
 } | null;
@@ -90,13 +90,10 @@ export function BranchesManager({
         return;
       }
 
-      setBranches((current) =>
-        current.map((branch) =>
-          branch.id === result.branch.id
-            ? { ...branch, name: result.branch.name, location: result.branch.location }
-            : branch
-        )
-      );
+      const changed = result.branch;
+      setBranches((current) => editingBranch.id === null
+        ? [...current, { ...changed, registeredMembers: 0, activeMembers: 0 }].sort((a, b) => a.name.localeCompare(b.name))
+        : current.map((branch) => branch.id === changed.id ? { ...branch, ...changed } : branch));
       setEditingBranch(null);
       router.refresh();
     });
@@ -106,6 +103,9 @@ export function BranchesManager({
     <AdminPageTransition>
       <div className="space-y-10">
         <AdminPageHeader title="Branches" actionLabel={`${branches.length} locations`} />
+        <Button type="button" onClick={() => { setErrorMessage(""); setEditingBranch({ id: null, name: "", location: "" }); }}>
+          Add branch
+        </Button>
 
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
           {branches.map((branch, index) => (
@@ -187,7 +187,7 @@ export function BranchesManager({
                     Edit Location
                   </p>
                   <h2 id="branch-editor-title" className="mt-1 font-display text-2xl font-black uppercase tracking-tight text-foreground">
-                    {editingBranch.name}
+                    {editingBranch.id === null ? "Add branch" : "Edit branch"}
                   </h2>
                 </div>
                 <button

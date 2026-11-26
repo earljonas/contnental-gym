@@ -33,7 +33,8 @@ export async function updateSession(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const isAuthPage = path.startsWith("/login") || path.startsWith("/register");
   const isProtectedPage =
-    path.startsWith("/dashboard") || path.startsWith("/admin") || path.startsWith("/branch");
+    path.startsWith("/dashboard") || path.startsWith("/admin") || path.startsWith("/branch")
+    || path.startsWith("/super-admin") || path === "/staff-verification";
 
   if (!user && isProtectedPage) {
     const url = request.nextUrl.clone();
@@ -46,6 +47,22 @@ export async function updateSession(request: NextRequest) {
     const roleInfo = await getUserRole(supabase, user.id);
     url.pathname = getRouteForRole(roleInfo.role);
     return NextResponse.redirect(url);
+  }
+
+  if (user && /^\/(?:admin|branch|super-admin)(?:\/|$)/.test(path)) {
+    const role = await getUserRole(supabase, user.id);
+    if (role.role !== "MEMBER") {
+      const { data, error } = await supabase.rpc("staff_mfa_required");
+      if (error) return new NextResponse("Staff access could not be verified. Try again shortly.", { status: 503 });
+      if (data) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/staff-verification";
+        url.search = "";
+        const redirect = NextResponse.redirect(url);
+        supabaseResponse.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+        return redirect;
+      }
+    }
   }
 
   return supabaseResponse;

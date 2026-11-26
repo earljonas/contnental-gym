@@ -55,14 +55,16 @@ export function ProfilePage({ profile, membership, payments }: ProfilePageProps)
   const [showPassword, setShowPassword] = useState(false);
   const [showAllPayments, setShowAllPayments] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   async function handleSaveProfile() {
     setSaving(true);
+    setSaveError("");
     try {
       await updateProfile(form);
       setEditing(false);
-    } catch (err) {
-      console.error(err);
+    } catch {
+      setSaveError("Could not save your profile. Check the fields and try again.");
     } finally {
       setSaving(false);
     }
@@ -71,17 +73,24 @@ export function ProfilePage({ profile, membership, payments }: ProfilePageProps)
   async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    e.currentTarget.value = "";
+    setSaveError("");
+    if (file.size > 375_000 || !["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setSaveError("Choose a JPG, PNG, or WebP photo under 375 KB.");
+      return;
+    }
     setAvatarUploading(true);
     try {
-      // Convert to base64 data URL as fallback (no Supabase Storage bucket needed)
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const dataUrl = reader.result as string;
-        await updateAvatar(dataUrl);
-        setAvatarUploading(false);
-      };
-      reader.readAsDataURL(file);
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+      await updateAvatar(dataUrl);
     } catch {
+      setSaveError("Could not upload your photo. Try again.");
+    } finally {
       setAvatarUploading(false);
     }
   }
@@ -91,6 +100,7 @@ export function ProfilePage({ profile, membership, payments }: ProfilePageProps)
 
   return (
     <div className="space-y-8">
+      {saveError && <p role="alert" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{saveError}</p>}
       <div>
         <h1 className="font-display text-2xl font-black uppercase tracking-tight text-foreground md:text-3xl">
           Profile
@@ -147,7 +157,7 @@ export function ProfilePage({ profile, membership, payments }: ProfilePageProps)
                 <span className="text-[10px] text-foreground">...</span>
               </div>
             )}
-            <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+            <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleAvatarUpload} />
           </label>
 
           {/* Info */}

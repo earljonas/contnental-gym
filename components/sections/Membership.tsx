@@ -2,15 +2,9 @@
 
 import { motion } from "motion/react";
 
-const plans = [
-  { name: "Day Pass", price: 200, tag: "Drop-in" },
-  { name: "1 Month", price: 1000, tag: null },
-  { name: "3 Months", price: 2700, tag: null },
-  { name: "6 Months", price: 5100, tag: "Popular" },
-  { name: "12 Months", price: 9600, tag: "Best Value" },
-];
+import { formatPlanPrice, type PublicPlan } from "@/lib/gym/plans";
 
-export function Membership() {
+export function Membership({ plans, unavailable }: { plans: PublicPlan[]; unavailable: boolean }) {
   return (
     <section id="membership" className="section-shell bg-page-bg py-24 md:py-32 relative">
       {/* Abstract Background Glows */}
@@ -50,10 +44,16 @@ export function Membership() {
 
           {/* Right Column: Interactive List View */}
           <div className="flex flex-col border-t border-border-subtle">
+            {plans.length === 0 && (
+              <p className="py-8 text-text-secondary">
+                {unavailable ? "Rates are temporarily unavailable." : "No plans are open for enrollment."}{" "}
+                <a href="#contact" className="underline underline-offset-4">Contact the front desk.</a>
+              </p>
+            )}
             {plans.map((plan, index) => (
               <motion.a
-                href="#contact"
-                key={plan.name}
+                href="/register"
+                key={plan.id}
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-50px" }}
@@ -71,25 +71,14 @@ export function Membership() {
                       {plan.name}
                     </h3>
                     
-                    <div className="flex items-center gap-4 transition-transform duration-500 ease-out group-hover:translate-x-4">
-                      {plan.tag && (
-                        <span className={`text-[9px] font-bold uppercase tracking-[0.2em] px-2 py-0.5 ${
-                          plan.tag === 'Best Value' 
-                            ? 'bg-white text-black' 
-                            : 'border border-white/20 text-white/60'
-                        }`}>
-                          {plan.tag}
-                        </span>
-                      )}
-                    </div>
+                    <p className="text-sm text-text-secondary">{plan.duration} days</p>
                   </div>
 
                   {/* Price & Arrow Area */}
                   <div className="relative flex items-center justify-start md:justify-end">
                     {/* Price block shifts left on hover on desktop to make room for arrow */}
                     <div className="font-display text-4xl md:text-5xl font-black text-white transition-transform duration-500 ease-out md:group-hover:-translate-x-16">
-                      <span className="text-2xl md:text-3xl text-white/30 font-medium mr-1.5">₱</span>
-                      {plan.price.toLocaleString()}
+                      {formatPlanPrice(plan.price)}
                     </div>
                     
                     {/* Arrow slides in from right */}

@@ -35,7 +35,7 @@ Supabase Auth handles email, password, and signup verification. The session is s
 
 The database creates a profile at signup. A [trigger](../supabase/patch-fix-role-routing.sql) mirrors profile role and branch changes to `user_roles`. Postgres policies can query that dedicated table through helper functions, avoiding role checks that must query `profiles` from within profile policies.
 
-Branch access depends on the operation. Staff can look up members from other locations for check-in, while the attendance action writes the staff member’s assigned branch. Branch billing queries filter on the collection branch. The staff actions for walk-in registration and completion of an existing account can use a [server-only Supabase client](../lib/supabase/admin.ts). That client bypasses row-level security, so the branch-admin check in each action is part of the authorization boundary.
+Branch access depends on the operation. Staff can look up members from other locations for check-in, while the attendance action writes the staff member’s assigned branch. Branch billing queries filter on the collection branch. Only walk-in Auth creation and the optional coach meter use the [server-only Supabase client](../lib/supabase/admin.ts). That client bypasses row-level security. Walk-in provisioning checks the branch role and required MFA before creating an Auth user. The Auth account remains recoverable through “Complete registration” when the separate database transaction cannot be confirmed.
 
 ## Membership and attendance
 
@@ -43,7 +43,7 @@ Branch access depends on the operation. Staff can look up members from other loc
 2. **Activation.** Branch staff select a pending registration. The app assigns an unassigned member to the branch, changes the membership to `ACTIVE` with plan-derived dates, and writes a confirmed payment record. Cash and GCash are recorded by staff.
 3. **Check-in.** Staff scan the member’s QR code or use manual search. The attendance action looks up membership status and checks for a visit already recorded that day before inserting attendance at the staff member’s branch.
 
-The [branch activation action](../app/(branch)/branch/actions.ts) uses separate database writes for branch assignment, membership activation, and payment recording. If the last write fails, the earlier writes can remain in place. The [attendance action](../app/(branch)/branch/attendance/actions.ts) checks for duplicates in application code using the server’s calendar day. The schema has no uniqueness constraint for one visit per member per day.
+Enrollment, settlement, and visit recording run through the [pilot operations migration](../supabase/migrations/20261126000200_pilot_operations.sql). Settlement locks the member and commits branch assignment, payment, and activation together. Repeating the same settlement returns the existing receipt. Visit recording holds the member lock, checks the membership's effective dates, and keeps a single visit per member per Manila business date across branches. The attendance row records the visited branch and staff operator. Staff MFA can be required at the database boundary.
 
 ## Data model
 
@@ -61,9 +61,9 @@ erDiagram
 
 - **Branch attribution.** `profiles.branch_id` is the member’s home branch or a staff member’s assigned branch. `payments.branch_id` identifies the location that collected payment. `attendance.branch_id` identifies where the visit occurred. The collection-branch patch backfills older payments from the associated profile where a branch is available.
 - **Training history.** `routines` and `routine_exercises` store editable templates. `workout_sessions.exercises` stores the exercise names and set data for the completed workout as JSONB. The session also stores the routine name, so history can still show the original details after a routine changes or is deleted. `body_metrics` stores dated measurements. The exercise picker reads a [bundled catalog](../public/data/exercises.json).
-- **Announcements.** The super admin can target all branches or selected branches and set a future publish time. The [feed query layer](../lib/announcements.ts) filters sent items by publication time and branch for portal display. Those feed filters should be treated as display rules when reviewing database access.
+- **Announcements.** The super admin can target all branches or selected branches and set a future publish time. The [feed query layer](../lib/announcements.ts) filters sent items by publication time and branch for portal display. RLS also requires publication time and audience membership.
 
-The base schema and follow-up SQL files are kept in [`supabase/`](../supabase/). See the [fresh database sequence](GETTING_STARTED.md#initialize-the-database) for the patch dependencies and validation scope.
+The database is defined by the [ordered migrations](../supabase/migrations). See [database setup](GETTING_STARTED.md#initialize-the-database) for the fresh and legacy paths.
 
 ## HTTP endpoints
 
@@ -75,6 +75,6 @@ The base schema and follow-up SQL files are kept in [`supabase/`](../supabase/).
 
 ### AI coach
 
-The member dashboard supplies profile, membership, and recent workout details to the chat component. The route uses the submitted context to construct a system prompt and sends it with up to 20 chat messages to Ollama’s `/api/chat`. The Next.js handler converts the model’s newline-delimited response into server-sent events for the browser.
+The coach is disabled by default. For an authorized cohort, `/api/coach` accepts bounded chat history and an optional request to include recent sets from the authenticated member. Workout context contains only exercise names from the bundled catalog, weights, and repetitions. The route excludes identity and billing fields. A shared database reservation limits spend and concurrency across app instances. The provider adapter normalizes Ollama NDJSON and Groq or OpenAI SSE as event streams for the browser.
 
-The request can include the member’s first name, membership status, training goals, and up to ten recent sessions with set details. Keep that data flow in mind when configuring a remote model server. The coach is optional for local development. [Ollama chat API](https://docs.ollama.com/api/chat)
+See the [pilot runbook](PILOT_RUNBOOK.md#coach-evaluation) for the provider evaluation and rollout checks.

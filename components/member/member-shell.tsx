@@ -41,11 +41,11 @@ export function MemberShell({
 
   // Hide shell during active session for distraction-free workout
   if (isSessionPage) {
-    return <div className="min-h-screen bg-background">{children}</div>;
+    return <div className="portal-type min-h-screen bg-background">{children}</div>;
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="portal-type min-h-screen bg-background">
       {/* ── Desktop Sidebar ── */}
       <aside className="hidden md:fixed md:inset-y-0 md:left-0 md:z-30 md:flex md:w-64 md:flex-col md:border-r md:border-border md:bg-background">
         {/* Sidebar header */}

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { BranchAttendancePage } from "@/components/admin/branch-attendance";
-import { getBranchAttendance, getSearchableMembers } from "@/lib/branch-admin/data";
+import { getBranchAttendance } from "@/lib/branch-admin/data";
 import { createClient } from "@/lib/supabase/server";
 import { getUserRole } from "@/lib/supabase/roles";
 
@@ -25,15 +25,11 @@ export default async function AttendancePage({
   const params = await searchParams;
   const dateFilter = params.date || undefined;
 
-  const [data, members] = await Promise.all([
-    getBranchAttendance(roleInfo.branch_id, dateFilter),
-    getSearchableMembers(roleInfo.branch_id),
-  ]);
+  const data = await getBranchAttendance(roleInfo.branch_id, dateFilter);
 
   return (
     <BranchAttendancePage
       data={data}
-      members={members}
       dateFilter={dateFilter}
     />
   );

@@ -3,8 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
-/* ─── Create Routine ─── */
-export async function createRoutine(data: {
+type RoutineInput = {
   name: string;
   days: string[];
   exercises: {
@@ -15,96 +14,26 @@ export async function createRoutine(data: {
     default_reps: number;
     default_weight: number;
   }[];
-}) {
+};
+
+async function saveRoutine(routineId: number | null, input: RoutineInput) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
-
-  const { data: routine, error: routineError } = await supabase
-    .from("routines")
-    .insert({ user_id: user.id, name: data.name, days: data.days })
-    .select("id")
-    .single();
-
-  if (routineError) throw new Error(routineError.message);
-
-  if (data.exercises.length > 0) {
-    const exercises = data.exercises.map((ex, i) => ({
-      routine_id: routine.id,
-      exercise_id: ex.exercise_id,
-      exercise_name: ex.exercise_name,
-      target_muscle: ex.target_muscle,
-      default_sets: ex.default_sets,
-      default_reps: ex.default_reps,
-      default_weight: ex.default_weight,
-      sort_order: i,
-    }));
-
-    const { error: exError } = await supabase
-      .from("routine_exercises")
-      .insert(exercises);
-
-    if (exError) throw new Error(exError.message);
-  }
-
+  const { data, error } = await supabase.rpc("save_gym_routine", {
+    routine_key: routineId, routine_name: input.name,
+    routine_days: input.days, exercise_rows: input.exercises,
+  });
+  if (error || typeof data !== "number") throw new Error("Could not save the routine. Check the exercise details and try again.");
   revalidatePath("/dashboard/workouts");
-  return { id: routine.id };
+  revalidatePath("/dashboard");
+  return { id: data };
 }
 
-/* ─── Update Routine ─── */
-export async function updateRoutine(
-  routineId: number,
-  data: {
-    name: string;
-    days: string[];
-    exercises: {
-      exercise_id: string;
-      exercise_name: string;
-      target_muscle: string;
-      default_sets: number;
-      default_reps: number;
-      default_weight: number;
-    }[];
-  },
-) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
+export async function createRoutine(data: RoutineInput) {
+  return saveRoutine(null, data);
+}
 
-  const { error: updateError } = await supabase
-    .from("routines")
-    .update({ name: data.name, days: data.days, updated_at: new Date().toISOString() })
-    .eq("id", routineId)
-    .eq("user_id", user.id);
-
-  if (updateError) throw new Error(updateError.message);
-
-  // Delete old exercises and re-insert
-  await supabase
-    .from("routine_exercises")
-    .delete()
-    .eq("routine_id", routineId);
-
-  if (data.exercises.length > 0) {
-    const exercises = data.exercises.map((ex, i) => ({
-      routine_id: routineId,
-      exercise_id: ex.exercise_id,
-      exercise_name: ex.exercise_name,
-      target_muscle: ex.target_muscle,
-      default_sets: ex.default_sets,
-      default_reps: ex.default_reps,
-      default_weight: ex.default_weight,
-      sort_order: i,
-    }));
-
-    await supabase.from("routine_exercises").insert(exercises);
-  }
-
-  revalidatePath("/dashboard/workouts");
+export async function updateRoutine(routineId: number, data: RoutineInput) {
+  await saveRoutine(routineId, data);
 }
 
 /* ─── Delete Routine ─── */

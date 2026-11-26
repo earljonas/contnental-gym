@@ -16,6 +16,14 @@ const dmSans = localFont({
   display: "swap",
 });
 
+const geist = localFont({
+  src: "./fonts/geist.woff2",
+  variable: "--font-geist",
+  weight: "100 900",
+  display: "swap",
+  preload: false,
+});
+
 export const metadata: Metadata = {
   title: "Contnental Fitness Gym - Davao City",
   description:
@@ -47,7 +55,7 @@ export default function RootLayout({
     <html
       lang="en"
       data-scroll-behavior="smooth"
-      className={`${barlowCondensed.variable} ${dmSans.variable} h-full antialiased`}
+      className={`${barlowCondensed.variable} ${dmSans.variable} ${geist.variable} h-full antialiased`}
     >
       <body className="font-body text-text-primary bg-background min-h-full flex flex-col">
         {children}

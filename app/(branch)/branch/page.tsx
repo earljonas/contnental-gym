@@ -18,7 +18,10 @@ export default async function BranchPage() {
     redirect("/login");
   }
 
-  const data = await getBranchDashboard(roleInfo.branch_id);
+  const [data, { data: branch }] = await Promise.all([
+    getBranchDashboard(roleInfo.branch_id),
+    supabase.from("branches").select("name").eq("id", roleInfo.branch_id).maybeSingle(),
+  ]);
 
-  return <BranchDashboardPage data={data} />;
+  return <BranchDashboardPage data={data} branchName={branch?.name ?? "Current branch"} />;
 }

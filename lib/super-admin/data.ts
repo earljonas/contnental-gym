@@ -1,3 +1,5 @@
+import { addGymDays, gymDate, gymDayStart, gymTimeZone } from "@/lib/gym/business-date";
+import { effectiveMembershipStatus } from "@/lib/member-membership";
 import { createClient } from "@/lib/supabase/server";
 
 export type DashboardMetric = {
@@ -97,6 +99,7 @@ export type SuperAttendanceLogRow = {
 };
 
 export type SuperAdminAttendanceData = {
+  unavailable?: boolean;
   metrics: SuperAttendanceMetric[];
   dailyTrend: AttendanceTrendPoint[];
   branchSplit: AttendanceBranchPoint[];
@@ -123,6 +126,7 @@ export type AnnouncementRow = {
 };
 
 type OverviewData = {
+  unavailable?: boolean;
   metrics: DashboardMetric[];
   revenueTrend: TrendPoint[];
   checkInTrend: TrendPoint[];
@@ -161,25 +165,28 @@ const emptyOverview: OverviewData = {
   announcements: [],
 };
 
+async function reportPages<Row>(fetchPage: (from: number, to: number) => PromiseLike<{
+  data: Row[] | null; error: { code?: string } | null;
+}>) {
+  const pageSize = 250;
+  const rows: Row[] = [];
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await fetchPage(offset, offset + pageSize - 1);
+    if (error) return { data: null, error };
+    rows.push(...(data ?? []));
+    if (!data || data.length < pageSize) return { data: rows, error: null };
+  }
+}
+
 function getPeriodWindow(period: DashboardPeriod) {
   const now = new Date();
+  const today = gymDate(now);
+  const [year, month] = today.split("-");
+  const quarterMonth = String(Math.floor((Number(month) - 1) / 3) * 3 + 1).padStart(2, "0");
+  const start = new Date(gymDayStart(period === "quarter" ? `${year}-${quarterMonth}-01` : addGymDays(today, period === "7d" ? -6 : -29)));
   const end = endOfLocalDay(now);
-  const start = startOfLocalDay(now);
-
-  if (period === "7d") {
-    start.setDate(start.getDate() - 6);
-  } else if (period === "quarter") {
-    start.setMonth(Math.floor(start.getMonth() / 3) * 3, 1);
-  } else {
-    start.setDate(start.getDate() - 29);
-  }
-
-  const previousStart = new Date(start);
-  const previousEnd = new Date(start);
-  previousEnd.setMilliseconds(previousEnd.getMilliseconds() - 1);
-  const windowMs = end.getTime() - start.getTime();
-  previousStart.setTime(previousEnd.getTime() - windowMs);
-
+  const previousEnd = new Date(start.getTime() - 1);
+  const previousStart = new Date(previousEnd.getTime() - (end.getTime() - start.getTime()));
   return { start, end, previousStart, previousEnd };
 }
 
@@ -190,7 +197,7 @@ function formatPeriodLabel(period: DashboardPeriod) {
 }
 
 function formatCurrency(value: number) {
-  return `PHP ${Math.round(value).toLocaleString()}`;
+  return `PHP ${value.toLocaleString("en-PH", { maximumFractionDigits: 2 })}`;
 }
 
 function statusFromMembership(status?: string): MemberRow["status"] {
@@ -207,31 +214,29 @@ function isOverdue(dateStr: string): boolean {
 }
 
 function startOfLocalDay(date: Date) {
-  const copy = new Date(date);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
+  return new Date(gymDayStart(gymDate(date)));
 }
 
 function endOfLocalDay(date: Date) {
-  const copy = new Date(date);
-  copy.setHours(23, 59, 59, 999);
-  return copy;
+  return new Date(Date.parse(gymDayStart(addGymDays(gymDate(date), 1))) - 1);
+}
+
+function shiftDays(date: Date, days: number) {
+  return new Date(date.getTime() + days * 86_400_000);
 }
 
 function formatDayLabel(date: Date) {
-  return date.toLocaleDateString("en-US", { weekday: "short" });
+  return date.toLocaleDateString("en-PH", { weekday: "short", timeZone: gymTimeZone });
 }
 
 function formatMonthLabel(date: Date) {
-  return date.toLocaleDateString("en-US", { month: "short" });
+  return date.toLocaleDateString("en-PH", { month: "short", timeZone: gymTimeZone });
 }
 
-function formatDateKey(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
+const formatDateKey = gymDate;
 
 function formatShortDate(date: Date) {
-  return date.toLocaleDateString("en-US", {
+  return date.toLocaleDateString("en-PH", { timeZone: gymTimeZone,
     month: "short",
     day: "numeric",
   });
@@ -256,18 +261,14 @@ export async function getSuperAdminAttendance(): Promise<SuperAdminAttendanceDat
     const now = new Date();
     const todayStart = startOfLocalDay(now);
     const todayEnd = endOfLocalDay(now);
-    const dayOfWeek = now.getDay();
+    const dayOfWeek = new Date(`${gymDate(now)}T00:00:00Z`).getUTCDay();
     const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-    const weekStart = startOfLocalDay(now);
-    weekStart.setDate(now.getDate() + mondayOffset);
-    const weekEnd = endOfLocalDay(new Date(weekStart));
-    weekEnd.setDate(weekStart.getDate() + 6);
-
-    const sevenDaysAgo = startOfLocalDay(now);
-    sevenDaysAgo.setDate(now.getDate() - 6);
+    const weekStart = shiftDays(todayStart, mondayOffset);
+    const weekEnd = endOfLocalDay(shiftDays(weekStart, 6));
+    const sevenDaysAgo = shiftDays(todayStart, -6);
 
     const [attendanceResult, branchesResult, profilesResult, membershipsResult] = await Promise.all([
-      supabase
+      reportPages((from, to) => supabase
         .from("attendance")
         .select(`
           id,
@@ -279,16 +280,12 @@ export async function getSuperAdminAttendance(): Promise<SuperAdminAttendanceDat
         `)
         .gte("check_in_time", sevenDaysAgo.toISOString())
         .lte("check_in_time", todayEnd.toISOString())
-        .order("check_in_time", { ascending: false }),
+        .order("check_in_time", { ascending: false }).order("id").range(from, to)),
       supabase.from("branches").select("id, name").order("name"),
-      supabase
-        .from("profiles")
-        .select("id, branch_id, branches(name)")
-        .eq("role", "MEMBER"),
-      supabase
-        .from("memberships")
-        .select("id, user_id, status, created_at")
-        .order("created_at", { ascending: false }),
+      reportPages((from, to) => supabase.from("profiles").select("id, branch_id, branches(name)")
+        .eq("role", "MEMBER").order("id").range(from, to)),
+      reportPages((from, to) => supabase.from("memberships").select("id, user_id, status, created_at, start_date, end_date")
+        .order("created_at", { ascending: false }).order("id").range(from, to)),
     ]);
 
     if (attendanceResult.error || branchesResult.error || profilesResult.error || membershipsResult.error) {
@@ -296,13 +293,13 @@ export async function getSuperAdminAttendance(): Promise<SuperAdminAttendanceDat
       if (branchesResult.error) console.error("[getSuperAdminAttendance] branches query failed:", branchesResult.error);
       if (profilesResult.error) console.error("[getSuperAdminAttendance] profiles query failed:", profilesResult.error);
       if (membershipsResult.error) console.error("[getSuperAdminAttendance] memberships query failed:", membershipsResult.error);
-      return empty;
+      return { ...empty, unavailable: true };
     }
 
     const attendance = attendanceResult.data ?? [];
     const allBranches = branchesResult.data ?? [];
     const profileById = new Map((profilesResult.data ?? []).map((profile) => [profile.id, profile]));
-    const latestMembershipByUser = new Map<string, { user_id: string; status?: string | null }>();
+    const latestMembershipByUser = new Map<string, NonNullable<typeof membershipsResult.data>[number]>();
     for (const membership of membershipsResult.data ?? []) {
       if (!latestMembershipByUser.has(membership.user_id)) {
         latestMembershipByUser.set(membership.user_id, membership);
@@ -328,19 +325,14 @@ export async function getSuperAdminAttendance(): Promise<SuperAdminAttendanceDat
 
     const hourlyCounts = new Map<number, number>();
     for (const row of todayRows) {
-      const hour = new Date(row.check_in_time).getHours();
+      const hour = Number(new Date(row.check_in_time).toLocaleTimeString("en-GB", { hourCycle: "h23", hour: "numeric", timeZone: gymTimeZone }));
       hourlyCounts.set(hour, (hourlyCounts.get(hour) ?? 0) + 1);
     }
     const peakHour = [...hourlyCounts.entries()].sort((a, b) => b[1] - a[1])[0] ?? null;
-    const peakHourLabel = peakHour
-      ? new Date(new Date().setHours(peakHour[0], 0, 0, 0)).toLocaleTimeString("en-US", {
-          hour: "numeric",
-        })
-      : "None";
+    const peakHourLabel = peakHour ? `${String(peakHour[0]).padStart(2, "0")}:00` : "None";
 
     const dailyTrend = Array.from({ length: 7 }, (_, index) => {
-      const date = startOfLocalDay(sevenDaysAgo);
-      date.setDate(sevenDaysAgo.getDate() + index);
+      const date = shiftDays(sevenDaysAgo, index);
       const key = formatDateKey(date);
       const value = attendance.filter((row) => formatDateKey(new Date(row.check_in_time)) === key).length;
       return {
@@ -363,7 +355,7 @@ export async function getSuperAdminAttendance(): Promise<SuperAdminAttendanceDat
       .map(([branch, value]) => ({ branch, value }))
       .sort((a, b) => b.value - a.value);
 
-    const rows = attendance.slice(0, 50).map((row) => {
+    const rows = attendance.map((row) => {
       const profile = row.profiles as unknown as { first_name?: string | null; last_name?: string | null } | null;
       const branch = Array.isArray(row.branches) ? row.branches[0] : row.branches;
       const registrationProfile = profileById.get(row.user_id);
@@ -379,13 +371,13 @@ export async function getSuperAdminAttendance(): Promise<SuperAdminAttendanceDat
         member: profile ? `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() || "Member" : "Member",
         branch: branch?.name ?? "Unknown",
         homeBranch: homeBranch?.name ?? "Unassigned",
-        membershipStatus: latestMembership?.status ?? "NONE",
-        date: date.toLocaleDateString("en-US", {
+        membershipStatus: effectiveMembershipStatus(latestMembership) ?? "NONE",
+        date: date.toLocaleDateString("en-PH", { timeZone: gymTimeZone,
           month: "short",
           day: "numeric",
           year: "numeric",
         }),
-        time: date.toLocaleTimeString("en-US", {
+        time: date.toLocaleTimeString("en-PH", { timeZone: gymTimeZone,
           hour: "numeric",
           minute: "2-digit",
         }),
@@ -425,7 +417,7 @@ export async function getSuperAdminAttendance(): Promise<SuperAdminAttendanceDat
     };
   } catch (error) {
     console.error("[getSuperAdminAttendance] Unexpected error:", error);
-    return empty;
+    return { ...empty, unavailable: true };
   }
 }
 
@@ -443,30 +435,25 @@ export async function getSuperAdminOverview(period: DashboardPeriod = "30d"): Pr
       todayAttendanceCountResult,
       branchesResult,
     ] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select("id, email, first_name, last_name, role, created_at, branch_id, branches(name)"),
-      supabase
-        .from("memberships")
+      reportPages((from, to) => supabase.from("profiles")
+        .select("id, email, first_name, last_name, role, created_at, branch_id, branches(name)").order("id").range(from, to)),
+      reportPages((from, to) => supabase.from("memberships")
         .select("id, user_id, plan_id, status, start_date, end_date, created_at, membership_plans(name, duration)")
-        .order("created_at", { ascending: false }),
+        .order("created_at", { ascending: false }).order("id").range(from, to)),
       supabase
         .from("membership_plans")
         .select("id, name, price, duration, is_active"),
-      supabase
-        .from("payments")
-        .select("id, user_id, branch_id, amount, payment_method, status, reference_number, created_at, branches(name)")
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("attendance")
+      reportPages((from, to) => supabase.from("payments")
+        .select("id, user_id, branch_id, amount, payment_method, status, reference_number, created_at, confirmed_at, branches(name)")
+        .order("created_at", { ascending: false }).order("id").range(from, to)),
+      reportPages((from, to) => supabase.from("attendance")
         .select("id, user_id, branch_id, check_in_time, branches(name)")
-        .order("check_in_time", { ascending: false })
-        .limit(500),
+        .order("check_in_time", { ascending: false }).order("id").range(from, to)),
       supabase
         .from("attendance")
         .select("id", { count: "exact", head: true })
-        .gte("check_in_time", new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
-        .lte("check_in_time", new Date(new Date().setHours(23, 59, 59, 999)).toISOString()),
+        .gte("check_in_time", new Date(Date.parse(gymDayStart(gymDate()))).toISOString())
+        .lte("check_in_time", new Date(Date.parse(gymDayStart(addGymDays(gymDate(), 1))) - 1).toISOString()),
       supabase.from("branches").select("id, name"),
     ]);
 
@@ -486,7 +473,7 @@ export async function getSuperAdminOverview(period: DashboardPeriod = "30d"): Pr
       if (attendanceResult.error) console.error("[getSuperAdminOverview] attendance query failed:", attendanceResult.error);
       if (todayAttendanceCountResult.error) console.error("[getSuperAdminOverview] today attendance count query failed:", todayAttendanceCountResult.error);
       if (branchesResult.error) console.error("[getSuperAdminOverview] branches query failed:", branchesResult.error);
-      return emptyOverview;
+      return { ...emptyOverview, unavailable: true };
     }
 
     const profiles = profilesResult.data ?? [];
@@ -497,22 +484,21 @@ export async function getSuperAdminOverview(period: DashboardPeriod = "30d"): Pr
     const branches = branchesResult.data ?? [];
 
     const members = profiles.filter((profile) => profile.role === "MEMBER");
-    const activeMemberIds = new Set(memberships.filter((membership) => membership.status === "ACTIVE").map((membership) => membership.user_id));
+    const activeMemberIds = new Set(memberships.filter((membership) => effectiveMembershipStatus(membership) === "ACTIVE").map((membership) => membership.user_id));
     const totalRevenue = payments
       .filter((payment) => payment.status === "CONFIRMED")
       .reduce((total, payment) => total + Number(payment.amount ?? 0), 0);
     const pendingPayments = payments.filter((payment) => payment.status === "PENDING");
-    const monthStart = startOfLocalDay(new Date());
-    monthStart.setDate(1);
+    const monthStart = new Date(gymDayStart(gymDate().slice(0, 7) + "-01"));
     const newMembersThisMonth = members.filter((member) => new Date(member.created_at) >= monthStart);
     const previousPeriodPayments = payments.filter(
       (payment) =>
         payment.status === "CONFIRMED" &&
-        new Date(payment.created_at) >= periodWindow.previousStart &&
-        new Date(payment.created_at) <= periodWindow.previousEnd
+        new Date(payment.confirmed_at ?? payment.created_at) >= periodWindow.previousStart &&
+        new Date(payment.confirmed_at ?? payment.created_at) <= periodWindow.previousEnd
     );
     const monthlyRevenue = payments
-      .filter((payment) => payment.status === "CONFIRMED" && new Date(payment.created_at) >= periodWindow.start)
+      .filter((payment) => payment.status === "CONFIRMED" && new Date(payment.confirmed_at ?? payment.created_at) >= periodWindow.start)
       .reduce((total, payment) => total + Number(payment.amount ?? 0), 0);
     const previousRevenue = previousPeriodPayments.reduce((total, payment) => total + Number(payment.amount ?? 0), 0);
     const branchNameById = new Map<number, string>(branches.map((branch) => [branch.id, branch.name]));
@@ -544,9 +530,9 @@ export async function getSuperAdminOverview(period: DashboardPeriod = "30d"): Pr
         email: member.email,
         branch: relatedBranch?.name ?? branchNameById.get(member.branch_id ?? -1) ?? "Unassigned",
         plan: (latestMembership?.membership_plans as { name?: string } | null)?.name ?? "No plan",
-        status: statusFromMembership(latestMembership?.status),
+        status: statusFromMembership(effectiveMembershipStatus(latestMembership) ?? undefined),
         expiryDate: latestMembership?.end_date
-          ? new Date(latestMembership.end_date).toLocaleDateString("en-US", {
+          ? new Date(latestMembership.end_date).toLocaleDateString("en-PH", { timeZone: gymTimeZone,
               month: "short",
               day: "numeric",
               year: "numeric",
@@ -555,7 +541,7 @@ export async function getSuperAdminOverview(period: DashboardPeriod = "30d"): Pr
         lastCheckIn: latestAttendanceByUser.get(member.id)
           ? formatShortDate(latestAttendanceByUser.get(member.id) as Date)
           : "Never",
-        joined: new Date(member.created_at).toLocaleDateString("en-US", {
+        joined: new Date(member.created_at).toLocaleDateString("en-PH", { timeZone: gymTimeZone,
           month: "short",
           day: "numeric",
           year: "numeric",
@@ -582,11 +568,11 @@ export async function getSuperAdminOverview(period: DashboardPeriod = "30d"): Pr
       return {
         member: member ? `${member.first_name} ${member.last_name}` : "Member",
         branch: branch?.name ?? "Branch",
-        time: date.toLocaleTimeString("en-US", {
+        time: date.toLocaleTimeString("en-PH", { timeZone: gymTimeZone,
           hour: "numeric",
           minute: "2-digit",
         }),
-        date: date.toLocaleDateString("en-US", {
+        date: date.toLocaleDateString("en-PH", { timeZone: gymTimeZone,
           month: "short",
           day: "numeric",
           year: "numeric",
@@ -605,12 +591,12 @@ export async function getSuperAdminOverview(period: DashboardPeriod = "30d"): Pr
         branch: collectionBranch?.name ?? branchNameById.get(payment.branch_id ?? -1) ?? "Unassigned",
         amount: formatCurrency(Number(payment.amount ?? 0)),
         method: payment.payment_method ?? "Unknown",
-        dueDate: new Date(payment.created_at).toLocaleDateString("en-US", {
+        dueDate: new Date(payment.created_at).toLocaleDateString("en-PH", { timeZone: gymTimeZone,
           month: "short",
           day: "numeric",
           year: "numeric",
         }),
-        date: new Date(payment.created_at).toLocaleDateString("en-US", {
+        date: new Date(payment.created_at).toLocaleDateString("en-PH", { timeZone: gymTimeZone,
           month: "short",
           day: "numeric",
           year: "numeric",
@@ -626,14 +612,13 @@ export async function getSuperAdminOverview(period: DashboardPeriod = "30d"): Pr
     });
 
     const revenueTrend = Array.from({ length: 6 }, (_, index) => {
-      const date = new Date();
-      date.setDate(1);
-      date.setMonth(date.getMonth() - (5 - index));
-      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      const calendar = new Date(gymDate().slice(0, 7) + "-01T12:00:00Z");
+      calendar.setUTCMonth(calendar.getUTCMonth() - (5 - index));
+      const date = calendar;
+      const key = gymDate(date).slice(0, 7);
       const value = payments
         .filter((payment) => {
-          const paymentDate = new Date(payment.created_at);
-          const paymentKey = `${paymentDate.getFullYear()}-${String(paymentDate.getMonth() + 1).padStart(2, "0")}`;
+          const paymentKey = gymDate(new Date(payment.confirmed_at ?? payment.created_at)).slice(0, 7);
           return payment.status === "CONFIRMED" && paymentKey === key;
         })
         .reduce((total, payment) => total + Number(payment.amount ?? 0), 0);
@@ -644,11 +629,9 @@ export async function getSuperAdminOverview(period: DashboardPeriod = "30d"): Pr
       };
     });
 
-    const sevenDaysAgo = startOfLocalDay(new Date());
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    const sevenDaysAgo = shiftDays(startOfLocalDay(new Date()), -6);
     const checkInTrend = Array.from({ length: 7 }, (_, index) => {
-      const date = startOfLocalDay(sevenDaysAgo);
-      date.setDate(sevenDaysAgo.getDate() + index);
+      const date = shiftDays(sevenDaysAgo, index);
       const key = formatDateKey(date);
       return {
         label: formatDayLabel(date),
@@ -726,10 +709,8 @@ export async function getSuperAdminOverview(period: DashboardPeriod = "30d"): Pr
       .map((item) => item.row);
 
     const today = startOfLocalDay(new Date());
-    const soon = startOfLocalDay(new Date());
-    soon.setDate(soon.getDate() + 14);
-    const inactiveCutoff = startOfLocalDay(new Date());
-    inactiveCutoff.setDate(inactiveCutoff.getDate() - 14);
+    const soon = shiftDays(today, 14);
+    const inactiveCutoff = shiftDays(today, -14);
 
     const liveRetention: RetentionRow[] = [];
     for (const member of liveMembers) {
@@ -748,7 +729,7 @@ export async function getSuperAdminOverview(period: DashboardPeriod = "30d"): Pr
       }
 
       if (membership?.status === "ACTIVE" && membership.end_date) {
-        const endDate = startOfLocalDay(new Date(membership.end_date));
+        const endDate = new Date(gymDayStart(membership.end_date));
         if (endDate >= today && endDate <= soon) {
           liveRetention.push({
             member: member.name,
@@ -832,6 +813,6 @@ export async function getSuperAdminOverview(period: DashboardPeriod = "30d"): Pr
     };
   } catch (error) {
     console.error("[getSuperAdminOverview] Unexpected error:", error);
-    return emptyOverview;
+    return { ...emptyOverview, unavailable: true };
   }
 }
